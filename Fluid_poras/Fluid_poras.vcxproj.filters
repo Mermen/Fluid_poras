@@ -20,12 +20,6 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <None Include="graph.csv">
-      <Filter>Resource Files</Filter>
-    </None>
-    <None Include="graph_out.csv">
-      <Filter>Resource Files</Filter>
-    </None>
     <None Include="fr_exp_9.dat">
       <Filter>Resource Files</Filter>
     </None>

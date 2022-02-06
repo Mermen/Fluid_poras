@@ -145,8 +145,6 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="fr_exp_9.dat" />
-    <None Include="graph.csv" />
-    <None Include="graph_out.csv" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
