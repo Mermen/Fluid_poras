@@ -19,6 +19,7 @@
 #include <windows.h>
 #include <thread>
 #include <mutex>
+std::mutex mtx;
 //using namespace std;
 
 template<typename Iter, typename RandomGenerator>
@@ -919,6 +920,9 @@ void leakage(std::vector<Pora>& poras, std::vector<double>& volume_filled_graph_
 
 
 void genegate_body(int N, std::vector<int> core_v, std::vector<int> DSIGMA_v, int i_min, int i_max, std::string connectionString) {
+    mtx.lock();
+    std::cout <<"Generate id: " << std::this_thread::get_id() << " started" << std::endl;
+    mtx.unlock();
     for (size_t i = i_min; i < i_max; i++)
     {
         for (size_t j = 0; j < DSIGMA_v.size(); j++)
@@ -934,9 +938,15 @@ void genegate_body(int N, std::vector<int> core_v, std::vector<int> DSIGMA_v, in
             insert_into_table(poras, table_name, connectionString);
         }
     }
+    mtx.lock();
+    std::cout << "Generate id: "<< std::this_thread::get_id() << " finished" << std::endl;;
+    mtx.unlock();
 }
 
 void empty_body(std::vector<int> core_v, std::vector<int> DSIGMA_v, int i_min, int i_max, std::string connectionString) {
+    mtx.lock();
+    std::cout << "Empty id: " << std::this_thread::get_id() << " started" << std::endl;
+    mtx.unlock();
     for (size_t i = i_min; i < i_max; i++)
     {
         for (size_t j = 0; j < DSIGMA_v.size(); j++)
@@ -957,15 +967,30 @@ void empty_body(std::vector<int> core_v, std::vector<int> DSIGMA_v, int i_min, i
             std::vector<double> pressure_graph_out;
             leakage(poras, volume_filled_graph_out, pressure_graph_out, volume_filled, core_v[i], DSIGMA_v[j]);
 
-
-
-
         }
     }
+    mtx.lock();
+    std::cout << "Empty id: " << std::this_thread::get_id() << " finished" << std::endl;;
+    mtx.unlock();
 }
 
+class SimpleTimer {
+public:
+    SimpleTimer() {
+        start = std::chrono::high_resolution_clock::now();
+    }
+    ~SimpleTimer() {
+        end = std::chrono::high_resolution_clock::now();
+        std::chrono::duration<float> duration = end - start;
+        std::cout << "Duratatioan: " << duration.count() << " s" << std::endl;
+    }
+
+private:
+    std::chrono::time_point<std::chrono::steady_clock> start, end;
+};
 
 int main() {
+    SimpleTimer st;
     SetConsoleOutputCP(1251);
     std::string connectionString = "host=localhost port=1768 dbname=porous_body user=postgres password =adu202121";
 
