@@ -17,6 +17,8 @@
 #include <pqxx/pqxx>
 #include <cstdio>
 #include <windows.h>
+#include <thread>
+#include <mutex>
 //using namespace std;
 
 template<typename Iter, typename RandomGenerator>
@@ -237,7 +239,7 @@ std::string to_string_pora(Pora pora) {
     {
         // Convert all but the last element to avoid a trailing ","
         std::copy(vec_area.begin(), vec_area.end() - 1,
-            std::ostream_iterator<int>(ostr_area, ","));
+            std::ostream_iterator<double>(ostr_area, ","));
 
         // Now add the last element with no delimiter
         ostr_area << vec_area.back();
@@ -262,6 +264,57 @@ void insert_into_table(std::vector<Pora>& poras, std::string table_name, std::st
         worker.exec("INSERT INTO " + table_name + " values("+std::to_string(i)+","
         + to_string_pora(poras[i])+");");
     }
+    worker.commit();
+    connectionObject.close();
+}
+
+void insert_into_table_graph(int core, int DSIGMA,std::vector<double> volume_filled_graph, std::vector<double> pressure_graph, std::string table_name, std::string connectionString) {
+    std::string str_volume = "";
+    std::string str_preassure = "";
+    std::ostringstream ostr_volume;
+    std::ostringstream ostr_preassure;
+    std::vector<double> vec_volume;
+    std::vector<double> vec_preassure;
+    vec_volume = volume_filled_graph;
+    vec_preassure = pressure_graph;
+
+    str_volume += '\'';
+    str_volume += '{';
+    if (!vec_volume.empty())
+    {
+        // Convert all but the last element to avoid a trailing ","
+        std::copy(vec_volume.begin(), vec_volume.end() - 1,
+            std::ostream_iterator<double>(ostr_volume, ","));
+
+        // Now add the last element with no delimiter
+        ostr_volume << vec_volume.back();
+    }
+    str_volume += ostr_volume.str();
+    str_volume += '}';
+    str_volume += '\'';
+
+    str_preassure += '\'';
+    str_preassure += '{';
+    if (!vec_preassure.empty())
+    {
+        // Convert all but the last element to avoid a trailing ","
+        std::copy(vec_preassure.begin(), vec_preassure.end() - 1,
+            std::ostream_iterator<double>(ostr_preassure, ","));
+
+        // Now add the last element with no delimiter
+        ostr_preassure << vec_preassure.back();
+    }
+    str_preassure += ostr_preassure.str();
+    str_preassure += '}';
+    str_preassure += '\'';
+    
+    
+    pqxx::connection connectionObject(connectionString.c_str());
+    pqxx::work worker(connectionObject);
+    worker.exec("set client_encoding='win1251'");
+    worker.exec("DELETE FROM " + table_name + " WHERE id=" + std::to_string(core) + std::to_string(DSIGMA) + ";");
+    worker.exec("INSERT INTO " + table_name + " values(" + std::to_string(core)+ std::to_string(DSIGMA) + ","
+            + str_volume +","+ str_preassure + ",'url');");
     worker.commit();
     connectionObject.close();
 }
@@ -336,9 +389,15 @@ void create_table(std::string table_name, std::string connectionString) {
     pqxx::connection connectionObject(connectionString.c_str());
     pqxx::work worker(connectionObject);
     worker.exec("set client_encoding='win1251'");
-    pqxx::result response = worker.exec("CREATE TABLE " + table_name
-    +" (id integer, x double precision, y double precision, z double precision, rad double precision, border integer, filled integer, emptied integer, path_to_border integer, way_to_border integer, neighbors_num integer[], neighbors_area double precision[]);");
+    std::string table_name_drop;
+    table_name_drop = '"' + table_name + '"';
+    pqxx::result response = worker.exec("DROP TABLE IF EXISTS "+ table_name);
     worker.commit();
+
+    pqxx::work worker1(connectionObject);
+    response = worker1.exec("CREATE TABLE " + table_name
+    +" (id integer, x double precision, y double precision, z double precision, rad double precision, border integer, filled integer, emptied integer, path_to_border integer, way_to_border integer, neighbors_num integer[], neighbors_area double precision[]);");
+    worker1.commit();
     connectionObject.close();
 }
 
@@ -447,8 +506,10 @@ int get_neibor_num(std::vector<Pora>& poras, int i) {
 }
 
 
-void filling(std::vector<Pora>& poras, std::vector<double>& volume_filled_graph, std::vector<double>& pressure_graph, double& volume_filled_sum, int N, double core, double DSIGMA, std::string table_name) {
-
+void filling(std::vector<Pora>& poras, std::vector<double>& volume_filled_graph, std::vector<double>& pressure_graph, double& volume_filled_sum, int N, int core_v, int DSIGMA_v) {
+    double core = (1.0 * core_v) / 100.0;
+    double DSIGMA = (1.0 * DSIGMA_v) / 1000.0;
+    std::string connectionString = "host=localhost port=1768 dbname=graphs user=postgres password =adu202121";
     int start_time = clock();
     double Rad = 5.0;     //средний радиус
     double sii = 1.0;   //дисперсия
@@ -601,7 +662,7 @@ void filling(std::vector<Pora>& poras, std::vector<double>& volume_filled_graph,
     int time_zap_start = clock();
     for (double pres = pressure_start; pres < pressure_end; pres += pressure_step) {
         zap_num_new = 1;
-        std::cout << pres << "\n";
+        //std::cout << pres << "\n";
         while (zap_num_new) {
             zap_num_new = 0;
 
@@ -630,8 +691,8 @@ void filling(std::vector<Pora>& poras, std::vector<double>& volume_filled_graph,
     int time_zap_end = clock();
 
     int time_zap_serch = time_zap_end - time_zap_start;
-    std::cout << N << "\n";
-    std::cout << time_zap_serch << "\n";
+    //std::cout << N << "\n";
+    //std::cout << time_zap_serch << "\n";
     double max_volume_filled;
     max_volume_filled = *max_element(volume_filled_graph.begin(), volume_filled_graph.end());
     volume_filled_sum = max_volume_filled;
@@ -643,7 +704,7 @@ void filling(std::vector<Pora>& poras, std::vector<double>& volume_filled_graph,
 
     int end_time = clock();
     int search_time = end_time - start_time;
-    std::cout << search_time << "\n";
+    //std::cout << search_time << "\n";
     /*
     ofstream fout("log.txt");
     fout << "time_zap" << "		" << time_zap_serch << "\n";
@@ -681,6 +742,8 @@ void filling(std::vector<Pora>& poras, std::vector<double>& volume_filled_graph,
     bout.close();
     */
 
+    insert_into_table_graph(core_v, DSIGMA_v, volume_filled_graph, pressure_graph, "graph_in", connectionString);
+    /*
     std::ofstream gout("graph_in_"+ table_name +".csv");
     gout << std::setprecision(16) << std::fixed;
     for (int i = 0; i < volume_filled_graph.size(); i++) {
@@ -689,13 +752,16 @@ void filling(std::vector<Pora>& poras, std::vector<double>& volume_filled_graph,
             gout << "\n";
     }
     gout.close();
-
+    */
 
 
 
 }
 
-void leakage(std::vector<Pora>& poras, std::vector<double>& volume_filled_graph_out, std::vector<double>& pressure_graph_out, double volume_filled, double core, double DSIGMA, std::string table_name) {
+void leakage(std::vector<Pora>& poras, std::vector<double>& volume_filled_graph_out, std::vector<double>& pressure_graph_out, double volume_filled, int core_v, int DSIGMA_v) {
+    double core = (1.0 * core_v) / 100.0;
+    double DSIGMA = (1.0 * DSIGMA_v) / 1000.0;
+    std::string connectionString = "host=localhost port=1768 dbname=graphs user=postgres password =adu202121";
     int start_time = clock();
     std::vector<int> zap_num;
     for (int i = 0; i < poras.size(); i++)
@@ -718,7 +784,7 @@ void leakage(std::vector<Pora>& poras, std::vector<double>& volume_filled_graph_
     int pos_e_p = 0;
     for (double pres = pressure_end - 1; pres > pressure_start - 1; pres -= pressure_step) {
         out_num_new = 1;
-        std::cout << pres << "\n";
+        //std::cout << pres << "\n";
         /*
         for (int i = 0; i < zap_num.size(); i++)
         {
@@ -836,7 +902,10 @@ void leakage(std::vector<Pora>& poras, std::vector<double>& volume_filled_graph_
     }
     int end_time = clock();
     int search_time = end_time - start_time;
-    std::cout << search_time << "\n";
+    //std::cout << search_time << "\n";
+
+    insert_into_table_graph(core_v, DSIGMA_v, volume_filled_graph_out, pressure_graph_out, "graph_out", connectionString);
+    /*
     std::ofstream gout("graph_out.csv");
     gout << std::setprecision(16) << std::fixed;
     for (int i = 0; i < volume_filled_graph_out.size(); i++) {
@@ -845,8 +914,55 @@ void leakage(std::vector<Pora>& poras, std::vector<double>& volume_filled_graph_
             gout << "\n";
     }
     gout.close();
+    */
 }
 
+
+void genegate_body(int N, std::vector<int> core_v, std::vector<int> DSIGMA_v, int i_min, int i_max, std::string connectionString) {
+    for (size_t i = i_min; i < i_max; i++)
+    {
+        for (size_t j = 0; j < DSIGMA_v.size(); j++)
+        {
+
+            std::string table_name = "body_core_" + std::to_string(core_v[i]) + "_DS_" + std::to_string(DSIGMA_v[j]);
+            std::vector<Pora> poras;
+            std::vector<double> volume_filled_graph;
+            std::vector<double> pressure_graph;
+            double volume_filled = 0;
+            filling(poras, volume_filled_graph, pressure_graph, volume_filled, N, core_v[i], DSIGMA_v[j]);
+            create_table(table_name, connectionString);
+            insert_into_table(poras, table_name, connectionString);
+        }
+    }
+}
+
+void empty_body(std::vector<int> core_v, std::vector<int> DSIGMA_v, int i_min, int i_max, std::string connectionString) {
+    for (size_t i = i_min; i < i_max; i++)
+    {
+        for (size_t j = 0; j < DSIGMA_v.size(); j++)
+        {
+            std::string table_name = "body_core_" + std::to_string(core_v[i]) + "_DS_" + std::to_string(DSIGMA_v[j]);
+            std::vector<Pora> poras;
+            select_from_table(poras, table_name, connectionString);
+            double volume_filled = 0;
+
+            for (size_t i = 0; i < poras.size(); i++)
+            {
+                if (poras[i].get_filled())
+                {
+                    volume_filled += ((4.0 * M_PI * pow(poras[i].get_Rad(), 3.0)) / 3.0);
+                }
+            }
+            std::vector<double> volume_filled_graph_out;
+            std::vector<double> pressure_graph_out;
+            leakage(poras, volume_filled_graph_out, pressure_graph_out, volume_filled, core_v[i], DSIGMA_v[j]);
+
+
+
+
+        }
+    }
+}
 
 
 int main() {
@@ -871,59 +987,67 @@ int main() {
 
     std::vector<int> core_v;
     std::vector<int> DSIGMA_v;
-    for (size_t i = 1; i <= 4; i++)
+    for (size_t i = 1; i <= 10; i++)
     {
-        core_v.push_back(50 + i);
+        core_v.push_back(50 + 4*i);
     }
-    for (size_t i = 1; i <= 4; i++)
+    for (size_t i = 1; i <= 10; i++)
     {
-        DSIGMA_v.push_back(i);
+        DSIGMA_v.push_back(5*i);
     }
     
     std::cout << "Пор на границе: ";
     int N;
     std::cin >> N;
-    for (size_t i = 0; i < core_v.size(); i++)
-    {
-        for (size_t j = 0; j < DSIGMA_v.size(); j++)
-        {
-            double core = (1.0 * core_v[i]) / 100.0;
-            double DSIGMA = (1.0 * DSIGMA_v[j]) / 1000.0;
-            std::string table_name = "body_core_" + std::to_string(core_v[i]) + "_DS_" + std::to_string(DSIGMA_v[j]);
-            std::vector<Pora> poras;
-            std::vector<double> volume_filled_graph;
-            std::vector<double> pressure_graph;
-            double volume_filled = 0;
-            filling(poras, volume_filled_graph, pressure_graph, volume_filled, N, core, DSIGMA, table_name);
-            create_table(table_name, connectionString);
-            insert_into_table(poras, table_name, connectionString);
-        }
-    }
-    std::cout << "Stop test" << std::endl;
-    std::cin >> N;
-    /*
-    select_from_table(poras, "body_1", connectionString);
-    std::cout << "select done" << std::endl;
-    std::cin>>N;
-    double volume_filled = 0;
-    if (volume_filled == 0)
-    {
-        for (size_t i = 0; i < poras.size(); i++)
-        {
-            if (poras[i].get_filled())
-            {
+    std::thread th1_in(genegate_body, N, core_v, DSIGMA_v, 0 * core_v.size() / 10, 1 * core_v.size() / 10, connectionString);
+    std::thread th2_in(genegate_body, N, core_v, DSIGMA_v, 1 * core_v.size() / 10, 2 * core_v.size() / 10, connectionString);
+    std::thread th3_in(genegate_body, N, core_v, DSIGMA_v, 2 * core_v.size() / 10, 3 * core_v.size() / 10, connectionString);
+    std::thread th4_in(genegate_body, N, core_v, DSIGMA_v, 3 * core_v.size() / 10, 4 * core_v.size() / 10, connectionString);
+    std::thread th5_in(genegate_body, N, core_v, DSIGMA_v, 4 * core_v.size() / 10, 5 * core_v.size() / 10, connectionString);
+    std::thread th6_in(genegate_body, N, core_v, DSIGMA_v, 5 * core_v.size() / 10, 6 * core_v.size() / 10, connectionString);
+    std::thread th7_in(genegate_body, N, core_v, DSIGMA_v, 6 * core_v.size() / 10, 7 * core_v.size() / 10, connectionString);
+    std::thread th8_in(genegate_body, N, core_v, DSIGMA_v, 7 * core_v.size() / 10, 8 * core_v.size() / 10, connectionString);
+    std::thread th9_in(genegate_body, N, core_v, DSIGMA_v, 8 * core_v.size() / 10, 9 * core_v.size() / 10, connectionString);
+    std::thread th10_in(genegate_body, N, core_v, DSIGMA_v, 9 * core_v.size() / 10, 10 * core_v.size() / 10, connectionString);
+    
+    th1_in.join();
+    th2_in.join();
+    th3_in.join();
+    th4_in.join();
+    th5_in.join();
+    th6_in.join();
+    th7_in.join();
+    th8_in.join();
+    th9_in.join();
+    th10_in.join();
 
-                volume_filled += ((4.0 * M_PI * pow(poras[i].get_Rad(), 3.0)) / 3.0);
-            }
-        }
-    }
-    std::cout << "Volume filled: " << volume_filled;
-    std::cin >> N;
-    std::vector<double> volume_filled_graph_out;
-    std::vector<double> pressure_graph_out;
-    leakage(poras, volume_filled_graph_out, pressure_graph_out, volume_filled, core, DSIGMA);
-    */
+    
+    //std::cout << "Stop test" << std::endl;
+    //std::cin >> N;
+
+    std::thread th1_out(empty_body, core_v, DSIGMA_v, 0 * core_v.size() / 10, 1 * core_v.size() / 10, connectionString);
+    std::thread th2_out(empty_body, core_v, DSIGMA_v, 1 * core_v.size() / 10, 2 * core_v.size() / 10, connectionString);
+    std::thread th3_out(empty_body, core_v, DSIGMA_v, 2 * core_v.size() / 10, 3 * core_v.size() / 10, connectionString);
+    std::thread th4_out(empty_body, core_v, DSIGMA_v, 3 * core_v.size() / 10, 4 * core_v.size() / 10, connectionString);
+    std::thread th5_out(empty_body, core_v, DSIGMA_v, 4 * core_v.size() / 10, 5 * core_v.size() / 10, connectionString);
+    std::thread th6_out(empty_body, core_v, DSIGMA_v, 5 * core_v.size() / 10, 6 * core_v.size() / 10, connectionString);
+    std::thread th7_out(empty_body, core_v, DSIGMA_v, 6 * core_v.size() / 10, 7 * core_v.size() / 10, connectionString);
+    std::thread th8_out(empty_body, core_v, DSIGMA_v, 7 * core_v.size() / 10, 8 * core_v.size() / 10, connectionString);
+    std::thread th9_out(empty_body, core_v, DSIGMA_v, 8 * core_v.size() / 10, 9 * core_v.size() / 10, connectionString);
+    std::thread th10_out(empty_body, core_v, DSIGMA_v, 9 * core_v.size() / 10, 10 * core_v.size() / 10, connectionString);
+
+    th1_out.join();
+    th2_out.join();
+    th3_out.join();
+    th4_out.join();
+    th5_out.join();
+    th6_out.join();
+    th7_out.join();
+    th8_out.join();
+    th9_out.join();
+    th10_out.join();
 
 
+    std::cout << "Success" << std::endl;
 
 }
