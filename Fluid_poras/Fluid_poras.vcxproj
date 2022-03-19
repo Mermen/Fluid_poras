@@ -146,6 +146,12 @@
   <ItemGroup>
     <None Include="fr_exp_9.dat" />
   </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="pSql.h" />
+    <ClInclude Include="Pora.h" />
+    <ClInclude Include="SimpleTimer.h" />
+    <ClInclude Include="supportFunc.h" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

@@ -13,394 +13,20 @@
 #include <ctime>
 #include <algorithm>
 #include <iomanip>
-#include  <iterator>
+#include <iterator>
 #include <pqxx/pqxx>
 #include <cstdio>
 #include <windows.h>
 #include <thread>
 #include <mutex>
+#include "Pora.h"
+#include "supportFunc.h"
+#include "pSql.h"
+#include "SimpleTimer.h"
+
 std::mutex mtx;
 //using namespace std;
 
-template<typename Iter, typename RandomGenerator>
-Iter select_randomly(Iter start, Iter end, RandomGenerator& g) {
-    std::uniform_int_distribution<> dis(0, std::distance(start, end) - 1);
-    std::advance(start, dis(g));
-    return start;
-}
-
-template<typename Iter>
-Iter select_randomly(Iter start, Iter end) {
-    static std::random_device rd;
-    static std::mt19937 gen(rd());
-    return select_randomly(start, end, gen);
-}
-
-double linear(std::vector<double>& x, std::vector<double>& y, std::vector<double>& k, std::vector<double>& b, double X, int n) {
-    // за пределами точек
-    if (X <= x[0])
-        return y[0];
-    else if (X >= x[n - 1])
-        return y[n - 1];
-
-    // между точками
-    /*
-    for (int i = 0; i < n - 1; ++i)
-        if (X > x[i] && X < x[i + 1])
-            return k[i] * X + b[i];
-    */
-    int middle = 0;
-    int left = 0;
-    int right = n;
-
-    while (1) {
-        middle = (left + right) / 2;
-        if (X < x[middle]) {
-            right = middle;
-        }
-        else if (X > x[middle]) {
-            left = middle;
-        }
-        if ((left + 1) == right) {
-            return k[left] * X + b[left];
-        }
-
-    }
-
-
-    // в точках
-    for (int i = 0; i < n - 1; ++i)
-        if (X == x[i])
-            return y[i];
-
-
-    return -1;	// ошибка
-}
-
-class Pora {
-    double X;
-    double Y;
-    double Z;
-    double Rad;
-    int border;
-    int filled;
-    int emptied;
-    int path_to_border;
-    int way_to_board;
-    std::vector<int> neighbors_num;
-    std::vector<double> neighbors_area;
-public: Pora(double x, double y, double z, double Rad, int border, int filled, int emptied, int path_to_border, int way_to_board) {
-    this->X = x;
-    this->Y = y;
-    this->Z = z;
-    this->Rad = Rad;
-    this->border = border;
-    this->filled = filled;
-    this->emptied = emptied;
-    this->path_to_border = path_to_border;
-    this->way_to_board = way_to_board;
-}
-      
-      double get_X() {
-          return this->X;
-      }
-      double get_Y() {
-          return this->Y;
-      }
-      double get_Z() {
-          return this->Z;
-      }
-      double get_Rad() {
-          return this->Rad;
-      }
-      int get_border() {
-          return this->border;
-      }
-      int get_filled() {
-          return this->filled;
-      }
-      int get_emptied() {
-          return this->emptied;
-      }
-      int get_path_to_border() {
-          return this->path_to_border;
-      }
-      int get_way_to_board() {
-          return this->way_to_board;
-      }
-      int get_neighbor_Num(int i) {
-          return this->neighbors_num[i];
-      }
-      std::vector<int> get_V_neighbor_Num() {
-          return this->neighbors_num;
-      }
-      double get_neighbor_Area(int i) {
-          return this->neighbors_area[i];
-      }
-      std::vector<double> get_V_neighbor_Area() {
-          return this->neighbors_area;
-      }
-
-      void set_border(int border) {
-          this->border = border;
-      }
-      void set_filled(int filled) {
-          this->filled = filled;
-      }
-      void set_emptied(int emptied) {
-          this->emptied = emptied;
-      }
-      void set_neighbor_Num(int k) {
-          this->neighbors_num.push_back(k);
-      }
-      void set_neighbor_Area(double area) {
-          this->neighbors_area.push_back(area);
-      }
-      void set_path_to_border(int path_to_border) {
-          this->path_to_border = path_to_border;
-      }
-      void set_way_to_board(int way_to_board) {
-          this->way_to_board = way_to_board;
-      }
-      void set_neighbors_num(std::vector<int> neighbors_num) {
-          this->neighbors_num = neighbors_num;
-      }
-      void set_neighbors_area(std::vector<double> neighbors_area) {
-          this->neighbors_area = neighbors_area;
-      }
-
-      int find_k(int k) {
-          for (int i = 0; i < this->neighbors_num.size(); i++)
-          {
-              if (this->neighbors_num[i] == k)
-              {
-                  return 1;
-
-              }
-          }
-          return 0;
-
-      }
-
-      int road_to_board(std::vector<Pora>& poras) {
-
-          if (this->border)
-          {
-              return 1;
-          }
-          else if (this->emptied) {
-              return 0;
-          }
-          else if (this->path_to_border)
-          {
-              return 0;
-          }
-          else
-          {
-              this->path_to_border = 1;
-              int road = 0;
-              for (int i = 0; i < this->neighbors_num.size(); i++)
-              {
-                  road += poras[neighbors_num[i]].road_to_board(poras);
-              }
-              return (road > 0);
-          }
-      }
-};
-
-std::string to_string_pora(Pora pora) {
-    std::string str;
-    std::string str_num="";
-    std::string str_area="";
-    std::ostringstream ostr_num;
-    std::ostringstream ostr_area;
-    std::vector<int> vec_num;
-    std::vector<double> vec_area;
-    vec_num = pora.get_V_neighbor_Num();
-    vec_area = pora.get_V_neighbor_Area();
-
-    str_num += '\'';
-    str_num += '{';
-    if (!vec_num.empty())
-    {
-        // Convert all but the last element to avoid a trailing ","
-        std::copy(vec_num.begin(), vec_num.end() - 1,
-            std::ostream_iterator<int>(ostr_num, ","));
-
-        // Now add the last element with no delimiter
-        ostr_num << vec_num.back();
-    }
-    str_num += ostr_num.str();
-    str_num += '}';
-    str_num += '\'';
-
-    str_area += '\'';
-    str_area += '{';
-    if (!vec_area.empty())
-    {
-        // Convert all but the last element to avoid a trailing ","
-        std::copy(vec_area.begin(), vec_area.end() - 1,
-            std::ostream_iterator<double>(ostr_area, ","));
-
-        // Now add the last element with no delimiter
-        ostr_area << vec_area.back();
-    }
-    str_area += ostr_area.str();
-    str_area += '}';
-    str_area += '\'';
-
-    str = std::to_string(pora.get_X()) + "," + std::to_string(pora.get_Y()) + "," + std::to_string(pora.get_Z()) + "," + std::to_string(pora.get_Rad()) + ","
-        + std::to_string(pora.get_border()) + "," + std::to_string(pora.get_filled()) + "," + std::to_string(pora.get_emptied()) + ","
-        + std::to_string(pora.get_path_to_border()) + "," + std::to_string(pora.get_way_to_board()) + ","
-        + str_num + "," + str_area;
-    return str;
-}
-
-void insert_into_table(std::vector<Pora>& poras, std::string table_name, std::string connectionString) {
-    pqxx::connection connectionObject(connectionString.c_str());
-    pqxx::work worker(connectionObject);
-    worker.exec("set client_encoding='win1251'");
-    for (size_t i = 0; i < poras.size(); i++)
-    {
-        worker.exec("INSERT INTO " + table_name + " values("+std::to_string(i)+","
-        + to_string_pora(poras[i])+");");
-    }
-    worker.commit();
-    connectionObject.close();
-}
-
-void insert_into_table_graph(int core, int DSIGMA,std::vector<double> volume_filled_graph, std::vector<double> pressure_graph, std::string table_name, std::string connectionString) {
-    std::string str_volume = "";
-    std::string str_preassure = "";
-    std::ostringstream ostr_volume;
-    std::ostringstream ostr_preassure;
-    std::vector<double> vec_volume;
-    std::vector<double> vec_preassure;
-    vec_volume = volume_filled_graph;
-    vec_preassure = pressure_graph;
-
-    str_volume += '\'';
-    str_volume += '{';
-    if (!vec_volume.empty())
-    {
-        // Convert all but the last element to avoid a trailing ","
-        std::copy(vec_volume.begin(), vec_volume.end() - 1,
-            std::ostream_iterator<double>(ostr_volume, ","));
-
-        // Now add the last element with no delimiter
-        ostr_volume << vec_volume.back();
-    }
-    str_volume += ostr_volume.str();
-    str_volume += '}';
-    str_volume += '\'';
-
-    str_preassure += '\'';
-    str_preassure += '{';
-    if (!vec_preassure.empty())
-    {
-        // Convert all but the last element to avoid a trailing ","
-        std::copy(vec_preassure.begin(), vec_preassure.end() - 1,
-            std::ostream_iterator<double>(ostr_preassure, ","));
-
-        // Now add the last element with no delimiter
-        ostr_preassure << vec_preassure.back();
-    }
-    str_preassure += ostr_preassure.str();
-    str_preassure += '}';
-    str_preassure += '\'';
-    
-    
-    pqxx::connection connectionObject(connectionString.c_str());
-    pqxx::work worker(connectionObject);
-    worker.exec("set client_encoding='win1251'");
-    worker.exec("DELETE FROM " + table_name + " WHERE id=" + std::to_string(core) + std::to_string(DSIGMA) + ";");
-    worker.exec("INSERT INTO " + table_name + " values(" + std::to_string(core)+ std::to_string(DSIGMA) + ","
-            + str_volume +","+ str_preassure + ",'url');");
-    worker.commit();
-    connectionObject.close();
-}
-
-void select_from_table(std::vector<Pora>& poras, std::string table_name, std::string connectionString) {
-    std::string str = "";
-    std::string tmp;
-    pqxx::connection connectionObject(connectionString.c_str());
-    pqxx::work worker(connectionObject);
-    worker.exec("set client_encoding='win1251'");
-    pqxx::result response = worker.exec("SELECT * FROM "+table_name);
-
-    for (size_t i = 0; i < response.size(); i++)
-    {
-        poras.push_back(Pora(std::stod(to_string(response[i][1])), std::stod(to_string(response[i][2])), std::stod(to_string(response[i][3])), std::stod(to_string(response[i][4])),
-            std::stoi(to_string(response[i][5])), std::stoi(to_string(response[i][6])), std::stoi(to_string(response[i][7])), std::stoi(to_string(response[i][8])), std::stoi(to_string(response[i][9]))));
-        std::stringstream ss0(to_string(response[i][10]).substr(1, to_string(response[i][10]).size() - 2));
-        std::vector<int> neighbors_num;
-        while (std::getline(ss0, tmp, ',')) {
-            neighbors_num.push_back(std::stoi(tmp));
-        }
-        poras[i].set_neighbors_num(neighbors_num);
-
-        std::stringstream ss1(to_string(response[i][11]).substr(1, to_string(response[i][11]).size() - 2));
-        std::vector<double> neighbors_area;
-        while (std::getline(ss1, tmp, ',')) {
-            neighbors_area.push_back(std::stod(tmp));
-        }
-        poras[i].set_neighbors_area(neighbors_area);
-
-        /*
-        str += to_string(response[i][0]) + " ";
-        for (size_t j = 1; j < 5; j++)
-        {
-            str += to_string(response[i][j]) + " ";
-        }
-        for (size_t j = 5; j < 10; j++)
-        {
-            str += to_string(response[i][j]) + " ";
-        }
-
-        std::stringstream ss0(to_string(response[i][10]).substr(1, to_string(response[i][10]).size() - 2));
-        std::vector<int> neighbors_num;
-        while (std::getline(ss0, tmp, ',')) {
-            neighbors_num.push_back(std::stoi(tmp));
-        }
-        for (size_t j = 0; j < neighbors_num.size(); j++)
-        {
-            str += std::to_string(neighbors_num[j])+" ";
-        }
-
-        std::stringstream ss1(to_string(response[i][11]).substr(1, to_string(response[i][11]).size() - 2));
-        std::vector<double> neighbors_area;
-        while (std::getline(ss1, tmp, ',')) {
-            neighbors_area.push_back(std::stod(tmp));
-        }
-        for (size_t j = 0; j < neighbors_area.size(); j++)
-        {
-            str += std::to_string(neighbors_area[j]) + " ";
-        }
-        std::cout << str << std::endl;
-        str = "";
-        */
-    }
-    worker.commit();
-    connectionObject.close();
-}
-
-void create_table(std::string table_name, std::string connectionString) {
-    std::string str = "";
-    std::string tmp;
-    pqxx::connection connectionObject(connectionString.c_str());
-    pqxx::work worker(connectionObject);
-    worker.exec("set client_encoding='win1251'");
-    std::string table_name_drop;
-    table_name_drop = '"' + table_name + '"';
-    pqxx::result response = worker.exec("DROP TABLE IF EXISTS "+ table_name);
-    worker.commit();
-
-    pqxx::work worker1(connectionObject);
-    response = worker1.exec("CREATE TABLE " + table_name
-    +" (id integer, x double precision, y double precision, z double precision, rad double precision, border integer, filled integer, emptied integer, path_to_border integer, way_to_border integer, neighbors_num integer[], neighbors_area double precision[]);");
-    worker1.commit();
-    connectionObject.close();
-}
 
 void Generation_Poras_gauss(double Rad, double core, std::vector<Pora>& poras, double N, double sii) {
     std::random_device rd_R;
@@ -470,28 +96,59 @@ int rabotas_in(std::vector<Pora>& poras, int i, double pres, double DSIGMA, doub
         SIGMA * (surf_empty - SMZ);
     return (work < 0);
 }
-double rabotas_out(std::vector<Pora>& poras, int i, double pres, double DSIGMA, double SIGMA) {
+
+double rabotas_out(std::vector<Pora>& poras, int number, double pres, double DSIGMA, double SIGMA) {
     double SM = 0;
     double SMZ = 0;
     double surf_empty = 0;
     double nei_zap = 0;
-    int qq = 0;
-    double work;
-    for (int j = 0; j < poras[i].get_V_neighbor_Num().size(); j++) {
+    double work = 0;
+    for (int j = 0; j < poras[number].get_V_neighbor_Num().size(); j++) {
 
-        SM += +poras[i].get_neighbor_Area(j);
-        if (poras[poras[i].get_neighbor_Num(j)].get_filled()) {
-            nei_zap++;
-            SMZ += poras[i].get_neighbor_Area(j);
+        SM += +poras[number].get_neighbor_Area(j);
+        if (poras[poras[number].get_neighbor_Num(j)].get_filled()) {
+            SMZ += poras[number].get_neighbor_Area(j);
         }
-        if (!(poras[poras[i].get_neighbor_Num(j)].get_filled())) {
-            surf_empty += poras[i].get_neighbor_Area(j);
+        if (!(poras[poras[number].get_neighbor_Num(j)].get_filled())) {
+            surf_empty += poras[number].get_neighbor_Area(j);
         }
     }
-    work = pres * 4.0 * pow(10.0, -9.0) * M_PI / 3.0 * pow(poras[i].get_Rad(), 3.0)
-        - (4.0 * M_PI * poras[i].get_Rad() * poras[i].get_Rad() - SM) * DSIGMA
+    work = pres * 4.0 * pow(10.0, -9.0) * M_PI / 3.0 * pow(poras[number].get_Rad(), 3.0)
+        - (4.0 * M_PI * poras[number].get_Rad() * poras[number].get_Rad() - SM) * DSIGMA
         - SIGMA * (surf_empty - SMZ);
     return work;
+}
+double rabotas_out_multy(std::vector<Pora>& poras, std::vector<int>& numbers, double pres, double DSIGMA, double SIGMA) {
+    double SM = 0;
+    double SMZ = 0;
+    double surf_empty = 0;
+    double nei_zap = 0;
+    double work = 0;
+    for (auto number : numbers) {
+        for (int j = 0; j < poras[number].get_V_neighbor_Num().size(); j++) {
+
+            SM += +poras[number].get_neighbor_Area(j);
+            if (poras[poras[number].get_neighbor_Num(j)].get_filled()) {
+                SMZ += poras[number].get_neighbor_Area(j);
+            }
+            if (!(poras[poras[number].get_neighbor_Num(j)].get_filled())) {
+                surf_empty += poras[number].get_neighbor_Area(j);
+            }
+        }
+        work += pres * 4.0 * pow(10.0, -9.0) * M_PI / 3.0 * pow(poras[number].get_Rad(), 3.0)
+            - (4.0 * M_PI * poras[number].get_Rad() * poras[number].get_Rad() - SM) * DSIGMA
+            - SIGMA * (surf_empty - SMZ);
+    }
+
+    for (auto number : numbers) {
+        for (int j = 0; j < poras[number].get_V_neighbor_Num().size(); j++) {
+            if (find_bool(numbers, poras[number].get_V_neighbor_Num()[j])) {
+                work -= SIGMA * poras[number].get_neighbor_Area(j);
+            }
+        }
+    }
+    return work;
+
 }
 
 int get_neibor_num(std::vector<Pora>& poras, int i) {
@@ -506,11 +163,10 @@ int get_neibor_num(std::vector<Pora>& poras, int i) {
     return num;
 }
 
-
 void filling(std::vector<Pora>& poras, std::vector<double>& volume_filled_graph, std::vector<double>& pressure_graph, double& volume_filled_sum, int N, int core_v, int DSIGMA_v) {
     double core = (1.0 * core_v) / 100.0;
     double DSIGMA = (1.0 * DSIGMA_v) / 1000.0;
-    std::string connectionString = "host=localhost port=1768 dbname=graphs user=postgres password =adu202121";
+    //std::string connectionString = "host=localhost port=1768 dbname=graphs user=postgres password =adu202121";
     int start_time = clock();
     double Rad = 5.0;     //средний радиус
     double sii = 1.0;   //дисперси€
@@ -523,7 +179,7 @@ void filling(std::vector<Pora>& poras, std::vector<double>& volume_filled_graph,
     // параметры давлени€. Ќачало, конец, шаг на заполнение, шаг на вытекание
     double pressure_start = 0;
     double pressure_end = 34000001;
-    double pressure_step = 100000;
+    double pressure_step = 10000;
     double poras_N = pow(N, 3.0);
 
 
@@ -556,8 +212,6 @@ void filling(std::vector<Pora>& poras, std::vector<double>& volume_filled_graph,
     //Generation_Poras_gauss(Rad, core, poras, N, sii);
 
 
-    //int aa;
-    //cin >> aa;
     std::vector<int> bound_1;
     std::vector<int> bound_2;
     std::vector<int> bound_3;
@@ -697,6 +351,7 @@ void filling(std::vector<Pora>& poras, std::vector<double>& volume_filled_graph,
     double max_volume_filled;
     max_volume_filled = *max_element(volume_filled_graph.begin(), volume_filled_graph.end());
     volume_filled_sum = max_volume_filled;
+
     for (int i = 0; i < volume_filled_graph.size(); i++)
     {
         volume_filled_graph[i] = volume_filled_graph[i] / max_volume_filled;
@@ -706,75 +361,24 @@ void filling(std::vector<Pora>& poras, std::vector<double>& volume_filled_graph,
     int end_time = clock();
     int search_time = end_time - start_time;
     //std::cout << search_time << "\n";
-    /*
-    ofstream fout("log.txt");
-    fout << "time_zap" << "		" << time_zap_serch << "\n";
-    fout << "time_zap_work" << "		" << search_time << "\n";
-    for (int i = 0; i < poras.size(); i++) {
-        fout << poras[i].get_Rad();
-        if (!(i == (poras.size() - 1)))
-            fout << "\n";
-    }
-    ofstream bout("bound.txt");
-    for (int i = 0; i < bound.size(); i++) {
-        bout << bound[i];
-        if (!(i == (bound.size() - 1)))
-            bout << "\n";
-    }
-
-    ofstream bout_area("bound_area.txt");
-    for (int i = 0; i < poras.size(); i++)
-    {
-        bout_area << i << "	-	" << poras[i].get_Rad() << "\n";
-
-        for (int j = 0; j < poras[i].get_V_neighbor_Num().size(); j++)
-        {
-            bout_area << "	" << poras[i].get_neighbor_Num(j) << " - " << poras[i].get_neighbor_Area(j);
-            if (!((i == (poras.size() - 1 ))&&(j == (poras[i].get_V_neighbor_Num().size() - 1))))
-                bout_area << "\n";
-        }
-        if (!(i == (poras.size() - 1)))
-            bout_area << "\n";
-    }
-
-    bout_area.close();
-    fin.close();
-    fout.close();
-    bout.close();
-    */
-
-    insert_into_table_graph(core_v, DSIGMA_v, volume_filled_graph, pressure_graph, "graph_in", connectionString);
-    /*
-    std::ofstream gout("graph_in_"+ table_name +".csv");
-    gout << std::setprecision(16) << std::fixed;
-    for (int i = 0; i < volume_filled_graph.size(); i++) {
-        gout << std::setprecision(16) << volume_filled_graph[i] << "," << std::setprecision(16) << pressure_graph[i];
-        if (!(i == (volume_filled_graph.size() - 1)))
-            gout << "\n";
-    }
-    gout.close();
-    */
-
-
-
 }
 
-void leakage(std::vector<Pora>& poras, std::vector<double>& volume_filled_graph_out, std::vector<double>& pressure_graph_out, double volume_filled, int core_v, int DSIGMA_v) {
+void leakage(std::vector<Pora>& poras, std::vector<double>& volume_filled_graph_out, std::vector<double>& pressure_graph_out, double volume_filled, int core_v, int DSIGMA_v, int border_C, int outflow_M, std::vector<int>& porous_neibors) {
     double core = (1.0 * core_v) / 100.0;
     double DSIGMA = (1.0 * DSIGMA_v) / 1000.0;
-    std::string connectionString = "host=localhost port=1768 dbname=graphs user=postgres password =adu202121";
+    //std::string connectionString = "host=localhost port=1768 dbname=graphs user=postgres password =adu202121";
     int start_time = clock();
     std::vector<int> zap_num;
     for (int i = 0; i < poras.size(); i++)
     {
-        if (poras[i].get_filled())
+        if (poras[i].get_filled() && !(poras[i].get_border()))
         {
             zap_num.push_back(i);
         }
     }
     double pressure_start = 0;
     double pressure_end = 34000001;
-    double pressure_step = 100000;
+    double pressure_step = 10000;
     //double DSIGMA = 40.0 / 1000.0; //DSIGMA поверхностна€ энерги€
     double SIGMA = 75.3 / 1000.0;//SIGMA поверхностна€ энерги€ жидкость-газ
     double out_num_new = 0;
@@ -785,26 +389,32 @@ void leakage(std::vector<Pora>& poras, std::vector<double>& volume_filled_graph_
     int pos_e_p = 0;
     for (double pres = pressure_end - 1; pres > pressure_start - 1; pres -= pressure_step) {
         out_num_new = 1;
-        //std::cout << pres << "\n";
-        /*
-        for (int i = 0; i < zap_num.size(); i++)
+        
+        if (border_C == 1)
         {
-            if (poras[zap_num[i]].road_to_board(poras)) {
-                for (int i = 0; i < poras.size(); i++)
-                {
-                    poras[i].set_path_to_border(0);
-                }
-                poras[zap_num[i]].set_way_to_board(1);
-            }
-            else
+
+            for (int j = 0; j < zap_num.size(); j++)
             {
-                for (int i = 0; i < poras.size(); i++)
+                if (rabotas_out(poras, zap_num[j], pres, DSIGMA, SIGMA) <= 0.0)
                 {
-                    poras[i].set_path_to_border(0);
+                    if (poras[zap_num[j]].road_to_board(poras)) {
+                        for (int i = 0; i < poras.size(); i++)
+                        {
+                            poras[i].set_path_to_border(0);
+                        }
+                        poras[zap_num[j]].set_way_to_board(1);
+                    }
+                    else
+                    {
+                        for (int i = 0; i < poras.size(); i++)
+                        {
+                            poras[i].set_path_to_border(0);
+                        }
+                    }
                 }
             }
+
         }
-        */
         while (out_num_new) {
             out_num_new = 0;
             //for (int i = 1; i <= 26; i++) {
@@ -813,46 +423,98 @@ void leakage(std::vector<Pora>& poras, std::vector<double>& volume_filled_graph_
             poras_Energy_pos.clear();
             poras_Energy_pos.shrink_to_fit();
             for (int j = 0; j < zap_num.size(); j++) {
-                if (!(poras[zap_num[j]].get_border())) {
-                    if (!(poras[zap_num[j]].get_emptied())) {
-                        //if (poras[zap_num[j]].get_way_to_board()) {
-                        if ((energy_out = rabotas_out(poras, zap_num[j], pres, DSIGMA, SIGMA)) <= 0.0) {
-                            
-                            if (poras[zap_num[j]].road_to_board(poras))
-                            {
-                                for (int i = 0; i < poras.size(); i++)
-                                {
-                                    poras[i].set_path_to_border(0);
-                                }
-                                
-                                poras_Energy.push_back(energy_out);
-                                poras_Energy_pos.push_back(zap_num[j]);
-                                
-                            }
-                            else
-                            {
-                                for (int i = 0; i < poras.size(); i++)
-                                {
-                                    poras[i].set_path_to_border(0);
-                                }
-                            }
-                            
-                            /*
-                            poras[zap_num[j]].set_emptied(1);
-                            poras[zap_num[j]].set_filled(0);
-                            volume_filled -= ((4.0 * M_PI * pow(poras[zap_num[j]].get_Rad(), 3.0)) / 3.0);
-                            zap_num.erase(zap_num.begin() + j);
-                            j = -1;
-                            i = 1;
-                            out_num_new++;
-                            */
-                        }
-                       // }
-                    }
+                
+                int flag_way_to_board_pressure = 1;
+                if (border_C == 1)
+                {
+                    flag_way_to_board_pressure = poras[zap_num[j]].get_way_to_board();
                 }
+                if (flag_way_to_board_pressure) {
+                if ((energy_out = rabotas_out(poras, zap_num[j], pres, DSIGMA, SIGMA)) <= 0.0) {
+                    int flag_way_to_board_each = 1;
+                    if (border_C == 2)
+                    {
+                        flag_way_to_board_each = poras[zap_num[j]].road_to_board(poras);
+                        for (int i = 0; i < poras.size(); i++)
+                        {
+                            poras[i].set_path_to_border(0);
+                        }
+                    }
+                    if (flag_way_to_board_each) {
+
+                    poras_Energy.push_back(energy_out);
+                    poras_Energy_pos.push_back(zap_num[j]);
+
+                    }
+
+                    /* не существенно
+                    poras[zap_num[j]].set_emptied(1);
+                    poras[zap_num[j]].set_filled(0);
+                    volume_filled -= ((4.0 * M_PI * pow(poras[zap_num[j]].get_Rad(), 3.0)) / 3.0);
+                    zap_num.erase(zap_num.begin() + j);
+                    j = -1;
+                    i = 1;
+                    out_num_new++;
+                    */
+                }
+                }
+
+
             }
             if (poras_Energy.size())
             {
+                switch (outflow_M)
+                {
+                    case 0:{
+                        for (int k = 0; k < poras_Energy_pos.size(); k++)
+                        {
+                            pos_e_p = poras_Energy_pos[k];
+                            poras[pos_e_p].set_emptied(1);
+                            poras[pos_e_p].set_filled(0);
+                            volume_filled -= ((4.0 * M_PI * pow(poras[pos_e_p].get_Rad(), 3.0)) / 3.0);
+                            auto it = std::find(zap_num.begin(), zap_num.end(), pos_e_p);
+                            int pos_zap_num = std::distance(begin(zap_num), it);
+                            zap_num.erase(zap_num.begin() + pos_zap_num);
+                            out_num_new++;
+                            porous_neibors.push_back(poras[pos_e_p].filled_now(poras));
+                        }
+                        
+                        break;
+                    }
+                    case 1: {
+                        std::vector<double>::iterator result = select_randomly(poras_Energy.begin(), poras_Energy.end());
+                        pos_e = std::distance(begin(poras_Energy), result);
+                        pos_e_p = poras_Energy_pos[pos_e];
+                        poras[pos_e_p].set_emptied(1);
+                        poras[pos_e_p].set_filled(0);
+                        volume_filled -= ((4.0 * M_PI * pow(poras[pos_e_p].get_Rad(), 3.0)) / 3.0);
+                        auto it = std::find(zap_num.begin(), zap_num.end(), pos_e_p);
+                        int pos_zap_num = std::distance(begin(zap_num), it);
+                        zap_num.erase(zap_num.begin() + pos_zap_num);
+                        out_num_new++;
+                        porous_neibors.push_back(poras[pos_e_p].filled_now(poras));
+                        
+                        break;
+                    }
+                    case 2: {
+                        std::vector<double>::iterator result = std::min_element(begin(poras_Energy), end(poras_Energy));
+                        pos_e = std::distance(begin(poras_Energy), result);
+                        pos_e_p = poras_Energy_pos[pos_e];
+                        poras[pos_e_p].set_emptied(1);
+                        poras[pos_e_p].set_filled(0);
+                        volume_filled -= ((4.0 * M_PI * pow(poras[pos_e_p].get_Rad(), 3.0)) / 3.0);
+                        auto it = std::find(zap_num.begin(), zap_num.end(), pos_e_p);
+                        int pos_zap_num = std::distance(begin(zap_num), it);
+                        zap_num.erase(zap_num.begin() + pos_zap_num);
+                        out_num_new++;
+                        porous_neibors.push_back(poras[pos_e_p].filled_now(poras));
+                        
+                        break;
+                    }
+                default:
+                    break;
+                }
+                /*
                 //std::vector<double>::iterator result = select_randomly(poras_Energy.begin(), poras_Energy.end());
                 std::vector<double>::iterator result = std::min_element(begin(poras_Energy), end(poras_Energy));
                 
@@ -867,21 +529,6 @@ void leakage(std::vector<Pora>& poras, std::vector<double>& volume_filled_graph_
                 //j = -1;
                 //i = 0;
                 out_num_new++;
-                
-                /*
-                                    for (int k = 0; k < poras_Energy_pos.size(); k++)
-                                    {
-                                        pos_e_p = poras_Energy_pos[k];
-                                        poras[pos_e_p].set_emptied(1);
-                                        poras[pos_e_p].set_filled(0);
-                                        volume_filled -= ((4.0 * M_PI * pow(poras[pos_e_p].get_Rad(), 3.0)) / 3.0);
-                                        auto it = std::find(zap_num.begin(), zap_num.end(), pos_e_p);
-                                        int pos_zap_num = std::distance(begin(zap_num), it);
-                                        zap_num.erase(zap_num.begin() + pos_zap_num);
-                                        //j = -1;
-                                        //i = 0;
-                                        out_num_new++;
-                                    }
                 */
 
             }
@@ -904,22 +551,17 @@ void leakage(std::vector<Pora>& poras, std::vector<double>& volume_filled_graph_
     int end_time = clock();
     int search_time = end_time - start_time;
     //std::cout << search_time << "\n";
-
-    insert_into_table_graph(core_v, DSIGMA_v, volume_filled_graph_out, pressure_graph_out, "graph_out", connectionString);
     /*
-    std::ofstream gout("graph_out.csv");
-    gout << std::setprecision(16) << std::fixed;
-    for (int i = 0; i < volume_filled_graph_out.size(); i++) {
-        gout << std::setprecision(16) << volume_filled_graph_out[i] << "," << std::setprecision(16) << pressure_graph_out[i];
-        if (!(i == (volume_filled_graph_out.size() - 1)))
-            gout << "\n";
+    std::cout << porous_neibors.size() << std::endl;
+    for (auto object : porous_neibors)
+    {
+        std::cout << object << " ";
     }
-    gout.close();
+    std::cout << std::endl;
     */
 }
 
-
-void genegate_body(int N, std::vector<int> core_v, std::vector<int> DSIGMA_v, int i_min, int i_max, std::string connectionString) {
+void genegate_body(int N, std::vector<int> core_v, std::vector<int> DSIGMA_v, int i_min, int i_max, std::string connectionString, int body_id) {
     mtx.lock();
     std::cout <<"Generate id: " << std::this_thread::get_id() << " started" << std::endl;
     mtx.unlock();
@@ -928,66 +570,63 @@ void genegate_body(int N, std::vector<int> core_v, std::vector<int> DSIGMA_v, in
         for (size_t j = 0; j < DSIGMA_v.size(); j++)
         {
 
-            std::string table_name = "body_core_" + std::to_string(core_v[i]) + "_DS_" + std::to_string(DSIGMA_v[j]);
+            std::string table_name = "body_core_" + std::to_string(core_v[i]) + "_DS_" + std::to_string(DSIGMA_v[j])+ "_ID_" + std::to_string(body_id);
+            std::string graph_id = std::to_string(core_v[i]) + std::to_string(DSIGMA_v[j]) + std::to_string(body_id);
             std::vector<Pora> poras;
             std::vector<double> volume_filled_graph;
             std::vector<double> pressure_graph;
             double volume_filled = 0;
             filling(poras, volume_filled_graph, pressure_graph, volume_filled, N, core_v[i], DSIGMA_v[j]);
+            std::string connectionString_graphs = "host=localhost port=1768 dbname=graphs user=postgres password =adu202121";
+            insert_into_table_graph(graph_id, volume_filled_graph, pressure_graph, "graph_in", connectionString_graphs);
             create_table(table_name, connectionString);
             insert_into_table(poras, table_name, connectionString);
         }
     }
     mtx.lock();
-    std::cout << "Generate id: "<< std::this_thread::get_id() << " finished" << std::endl;;
+    std::cout << "Generate id: "<< std::this_thread::get_id() << " finished" << std::endl;
     mtx.unlock();
 }
 
-void empty_body(std::vector<int> core_v, std::vector<int> DSIGMA_v, int i_min, int i_max, std::string connectionString) {
+void empty_body(std::vector<int> core_v, std::vector<int> DSIGMA_v, int i_min, int i_max, std::string connectionString, std::vector<int> body_id, int border_C, int outflow_M) {
     mtx.lock();
-    std::cout << "Empty id: " << std::this_thread::get_id() << " started" << std::endl;
+    std::cout << "Empty id: " << std::this_thread::get_id()<<" "<<border_C<<" "<<outflow_M << " started" << std::endl;
     mtx.unlock();
-    for (size_t i = i_min; i < i_max; i++)
-    {
-        for (size_t j = 0; j < DSIGMA_v.size(); j++)
+    for (size_t k = 0; k < body_id.size(); k++) {
+        for (size_t i = i_min; i < i_max; i++)
         {
-            std::string table_name = "body_core_" + std::to_string(core_v[i]) + "_DS_" + std::to_string(DSIGMA_v[j]);
-            std::vector<Pora> poras;
-            select_from_table(poras, table_name, connectionString);
-            double volume_filled = 0;
-
-            for (size_t i = 0; i < poras.size(); i++)
+            for (size_t j = 0; j < DSIGMA_v.size(); j++)
             {
-                if (poras[i].get_filled())
-                {
-                    volume_filled += ((4.0 * M_PI * pow(poras[i].get_Rad(), 3.0)) / 3.0);
-                }
-            }
-            std::vector<double> volume_filled_graph_out;
-            std::vector<double> pressure_graph_out;
-            leakage(poras, volume_filled_graph_out, pressure_graph_out, volume_filled, core_v[i], DSIGMA_v[j]);
+                std::string table_name = "body_core_" + std::to_string(core_v[i]) + "_DS_" + std::to_string(DSIGMA_v[j]) + "_ID_" + std::to_string(body_id[k]);
+                std::string graph_id = std::to_string(core_v[i]) + std::to_string(DSIGMA_v[j]) + std::to_string(body_id[k]) + std::to_string(border_C) + std::to_string(outflow_M);
+                std::vector<Pora> poras;
+                select_from_table(poras, table_name, connectionString);
+                double volume_filled = 0;
 
+                for (size_t i = 0; i < poras.size(); i++)
+                {
+                    if (poras[i].get_filled() && !(poras[i].get_border()))
+                    {
+                        volume_filled += ((4.0 * M_PI * pow(poras[i].get_Rad(), 3.0)) / 3.0);
+                    }
+                }
+                std::vector<double> volume_filled_graph_out;
+                std::vector<double> pressure_graph_out;
+                std::vector<int> porous_neibors;
+                leakage(poras, volume_filled_graph_out, pressure_graph_out, volume_filled, core_v[i], DSIGMA_v[j], border_C, outflow_M, porous_neibors);
+
+                std::string connectionString_graphs = "host=localhost port=1768 dbname=graphs user=postgres password =adu202121";
+                insert_into_table_graph(graph_id, volume_filled_graph_out, pressure_graph_out, "graph_out", connectionString_graphs);
+                connectionString_graphs = "host=localhost port=1768 dbname=graphs user=postgres password =adu202121";
+                insert_into_table_graph_li(graph_id, porous_neibors, connectionString_graphs);
+            }
         }
     }
     mtx.lock();
-    std::cout << "Empty id: " << std::this_thread::get_id() << " finished" << std::endl;;
+    std::cout << "Empty id: " << std::this_thread::get_id() << " " << border_C << " " << outflow_M << " finished" << std::endl;;
     mtx.unlock();
 }
 
-class SimpleTimer {
-public:
-    SimpleTimer() {
-        start = std::chrono::high_resolution_clock::now();
-    }
-    ~SimpleTimer() {
-        end = std::chrono::high_resolution_clock::now();
-        std::chrono::duration<float> duration = end - start;
-        std::cout << "Duratatioan: " << duration.count() << " s" << std::endl;
-    }
-
-private:
-    std::chrono::time_point<std::chrono::steady_clock> start, end;
-};
 
 int main() {
     SimpleTimer st;
@@ -1010,34 +649,46 @@ int main() {
     }
 */
 
+    // border_C: 0 - не учитываем, 1 - расчЄт после измениени€ давлени€, 2 - расчЄт дл€ каждой
+    // outflow_M: 0 - все, 1 - случайна€, 2 - с минимальной энерги€ей
+    //std::vector<int> body_id = { 1,2,3,4,5,6,7,8,9,10 };
+    std::vector<int> body_id = { 11 };
+    std::vector<int> border_C = { 0,1,2 };
+    std::vector<int> outflow_M = { 0,1,2 };
     std::vector<int> core_v;
     std::vector<int> DSIGMA_v;
     for (size_t i = 1; i <= 10; i++)
     {
-        core_v.push_back(50 + 4*i);
+        core_v.push_back(82);
     }
-    for (size_t i = 1; i <= 10; i++)
+    for (size_t i = 1; i <= 1; i++)
     {
-        DSIGMA_v.push_back(5*i);
+        DSIGMA_v.push_back(25);
     }
     
     std::cout << "ѕор на границе: ";
     int N;
     std::cin >> N;
-    std::thread th1_in(genegate_body, N, core_v, DSIGMA_v, 0 * core_v.size() / 10, 1 * core_v.size() / 10, connectionString);
-    std::thread th2_in(genegate_body, N, core_v, DSIGMA_v, 1 * core_v.size() / 10, 2 * core_v.size() / 10, connectionString);
-    std::thread th3_in(genegate_body, N, core_v, DSIGMA_v, 2 * core_v.size() / 10, 3 * core_v.size() / 10, connectionString);
-    std::thread th4_in(genegate_body, N, core_v, DSIGMA_v, 3 * core_v.size() / 10, 4 * core_v.size() / 10, connectionString);
-    std::thread th5_in(genegate_body, N, core_v, DSIGMA_v, 4 * core_v.size() / 10, 5 * core_v.size() / 10, connectionString);
-    std::thread th6_in(genegate_body, N, core_v, DSIGMA_v, 5 * core_v.size() / 10, 6 * core_v.size() / 10, connectionString);
-    std::thread th7_in(genegate_body, N, core_v, DSIGMA_v, 6 * core_v.size() / 10, 7 * core_v.size() / 10, connectionString);
-    std::thread th8_in(genegate_body, N, core_v, DSIGMA_v, 7 * core_v.size() / 10, 8 * core_v.size() / 10, connectionString);
-    std::thread th9_in(genegate_body, N, core_v, DSIGMA_v, 8 * core_v.size() / 10, 9 * core_v.size() / 10, connectionString);
-    std::thread th10_in(genegate_body, N, core_v, DSIGMA_v, 9 * core_v.size() / 10, 10 * core_v.size() / 10, connectionString);
+    //genegate_body(N, core_v, DSIGMA_v, 0 * core_v.size() / 10, 1 * core_v.size() / 10, connectionString, body_id[0]);
+    //std::thread th1_in(genegate_body, N, core_v, DSIGMA_v, 0 * core_v.size() / 10, 1 * core_v.size() / 10, connectionString, body_id[0]);
+    /*
+    std::thread th2_in(genegate_body, N, core_v, DSIGMA_v, 1 * core_v.size() / 10, 2 * core_v.size() / 10, connectionString, body_id[1]);
     
-    th1_in.join();
+    std::thread th3_in(genegate_body, N, core_v, DSIGMA_v, 2 * core_v.size() / 10, 3 * core_v.size() / 10, connectionString, body_id[2]);
+    
+    std::thread th4_in(genegate_body, N, core_v, DSIGMA_v, 3 * core_v.size() / 10, 4 * core_v.size() / 10, connectionString, body_id[0]);
+    std::thread th5_in(genegate_body, N, core_v, DSIGMA_v, 4 * core_v.size() / 10, 5 * core_v.size() / 10, connectionString, body_id[0]);
+    std::thread th6_in(genegate_body, N, core_v, DSIGMA_v, 5 * core_v.size() / 10, 6 * core_v.size() / 10, connectionString, body_id[0]);
+    std::thread th7_in(genegate_body, N, core_v, DSIGMA_v, 6 * core_v.size() / 10, 7 * core_v.size() / 10, connectionString, body_id[0]);
+    std::thread th8_in(genegate_body, N, core_v, DSIGMA_v, 7 * core_v.size() / 10, 8 * core_v.size() / 10, connectionString, body_id[0]);
+    std::thread th9_in(genegate_body, N, core_v, DSIGMA_v, 8 * core_v.size() / 10, 9 * core_v.size() / 10, connectionString, body_id[0]);
+    std::thread th10_in(genegate_body, N, core_v, DSIGMA_v, 9 * core_v.size() / 10, 10 * core_v.size() / 10, connectionString, body_id[0]);
+    */
+    //th1_in.join();
+    /*
     th2_in.join();
     th3_in.join();
+    
     th4_in.join();
     th5_in.join();
     th6_in.join();
@@ -1045,23 +696,29 @@ int main() {
     th8_in.join();
     th9_in.join();
     th10_in.join();
+    */
 
     
     //std::cout << "Stop test" << std::endl;
     //std::cin >> N;
-
-    std::thread th1_out(empty_body, core_v, DSIGMA_v, 0 * core_v.size() / 10, 1 * core_v.size() / 10, connectionString);
-    std::thread th2_out(empty_body, core_v, DSIGMA_v, 1 * core_v.size() / 10, 2 * core_v.size() / 10, connectionString);
-    std::thread th3_out(empty_body, core_v, DSIGMA_v, 2 * core_v.size() / 10, 3 * core_v.size() / 10, connectionString);
-    std::thread th4_out(empty_body, core_v, DSIGMA_v, 3 * core_v.size() / 10, 4 * core_v.size() / 10, connectionString);
-    std::thread th5_out(empty_body, core_v, DSIGMA_v, 4 * core_v.size() / 10, 5 * core_v.size() / 10, connectionString);
-    std::thread th6_out(empty_body, core_v, DSIGMA_v, 5 * core_v.size() / 10, 6 * core_v.size() / 10, connectionString);
-    std::thread th7_out(empty_body, core_v, DSIGMA_v, 6 * core_v.size() / 10, 7 * core_v.size() / 10, connectionString);
-    std::thread th8_out(empty_body, core_v, DSIGMA_v, 7 * core_v.size() / 10, 8 * core_v.size() / 10, connectionString);
-    std::thread th9_out(empty_body, core_v, DSIGMA_v, 8 * core_v.size() / 10, 9 * core_v.size() / 10, connectionString);
-    std::thread th10_out(empty_body, core_v, DSIGMA_v, 9 * core_v.size() / 10, 10 * core_v.size() / 10, connectionString);
+    
+    //empty_body(core_v, DSIGMA_v, 0 * core_v.size() / 10, 1 * core_v.size() / 10, connectionString, body_id, border_C[0], outflow_M[0]);
+    
+    std::thread th1_out(empty_body, core_v, DSIGMA_v, 0 * core_v.size() / 10, 1 * core_v.size() / 10, connectionString, body_id, border_C[2], outflow_M[2]);
+    /*
+    std::thread th2_out(empty_body, core_v, DSIGMA_v, 1 * core_v.size() / 10, 2 * core_v.size() / 10, connectionString, body_id, border_C[0], outflow_M[1]);
+    std::thread th3_out(empty_body, core_v, DSIGMA_v, 2 * core_v.size() / 10, 3 * core_v.size() / 10, connectionString, body_id, border_C[0], outflow_M[2]);
+    std::thread th4_out(empty_body, core_v, DSIGMA_v, 3 * core_v.size() / 10, 4 * core_v.size() / 10, connectionString, body_id, border_C[1], outflow_M[0]);
+    std::thread th5_out(empty_body, core_v, DSIGMA_v, 4 * core_v.size() / 10, 5 * core_v.size() / 10, connectionString, body_id, border_C[1], outflow_M[1]);
+    std::thread th6_out(empty_body, core_v, DSIGMA_v, 5 * core_v.size() / 10, 6 * core_v.size() / 10, connectionString, body_id, border_C[1], outflow_M[2]);
+    std::thread th7_out(empty_body, core_v, DSIGMA_v, 6 * core_v.size() / 10, 7 * core_v.size() / 10, connectionString, body_id, border_C[2], outflow_M[0]);
+    std::thread th8_out(empty_body, core_v, DSIGMA_v, 7 * core_v.size() / 10, 8 * core_v.size() / 10, connectionString, body_id, border_C[2], outflow_M[1]);
+    std::thread th9_out(empty_body, core_v, DSIGMA_v, 8 * core_v.size() / 10, 9 * core_v.size() / 10, connectionString, body_id, border_C[2], outflow_M[2]);
+    */
+    //std::thread th10_out(empty_body, core_v, DSIGMA_v, 9 * core_v.size() / 10, 10 * core_v.size() / 10, connectionString, body_id, border_C[2], outflow_M[2]);
 
     th1_out.join();
+    /*
     th2_out.join();
     th3_out.join();
     th4_out.join();
@@ -1070,7 +727,9 @@ int main() {
     th7_out.join();
     th8_out.join();
     th9_out.join();
-    th10_out.join();
+    */
+    //th10_out.join();
+    
 
 
     std::cout << "Success" << std::endl;
