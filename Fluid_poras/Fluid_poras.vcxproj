@@ -152,6 +152,9 @@
     <ClInclude Include="SimpleTimer.h" />
     <ClInclude Include="supportFunc.h" />
   </ItemGroup>
+  <ItemGroup>
+    <Text Include="txt.txt" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
