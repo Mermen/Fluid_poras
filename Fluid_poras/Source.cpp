@@ -34,11 +34,11 @@ void Generation_Poras_gauss(double Rad, double core, std::vector<Pora>& poras, d
 	bool kj = 0;
 	double Rad_tmp = 0;
 	double pot_por_rad = 0;
-	int start_time = clock();
 	for (int i = 0; i < N; i++) {
 		for (int j = 0; j < N; j++) {
 			for (int k = 0; k < N; k++) {
-				poras.push_back(Pora(Rad * core / 2.0 + 1.0 * i * (Rad + Rad) * core, Rad * core / 2.0 + 1.0 * j * (Rad + Rad) * core, Rad * core / 2.0 + 1.0 * k * (Rad + Rad) * core, uid_R(rd_R), 0, 0, 0, 0, 0));
+				/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////     uid_R(rd_R)
+				poras.push_back(Pora(Rad * core + 1.0 * i * (Rad + Rad) * core, Rad * core + 1.0 * j * (Rad + Rad) * core, Rad * core + 1.0 * k * (Rad + Rad) * core, uid_R(rd_R), 0, 0, 0, 0, 0));
 			}
 		}
 	}
@@ -67,7 +67,8 @@ void Generation_Poras_experiment(std::vector<double>& x, std::vector<double>& y,
 						kj = 1;
 					}
 				}
-				poras.push_back(Pora(Rad * core / 2.0 + 1.0 * i * (Rad + Rad) * core, Rad * core / 2.0 + 1.0 * j * (Rad + Rad) * core, Rad * core / 2.0 + 1.0 * k * (Rad + Rad) * core, Rad_tmp, 0, 0, 0, 0, 0));
+				/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////     Rad_tmp
+				poras.push_back(Pora(Rad * core + 1.0 * i * (Rad + Rad) * core, Rad * core + 1.0 * j * (Rad + Rad) * core, Rad * core + 1.0 * k * (Rad + Rad) * core, Rad_tmp, 0, 0, 0, 0, 0));
 			}
 		}
 	}
@@ -151,7 +152,7 @@ double rabotas_out_multi(std::vector<Pora>& poras, std::vector<int>& numbers, do
 
 }
 
-void filling(std::vector<Pora>& poras, std::vector<double>& volume_filled_graph, std::vector<double>& pressure_graph, double& volume_filled_sum, int N, int core_v, int DSIGMA_v) {
+void filling(std::vector<Pora>& poras, std::vector<double>& volume_filled_graph, std::vector<double>& pressure_graph, double& volume_filled_sum, int N, int core_v, int DSIGMA_v, int persent_for_del) {
 	double core = (1.0 * core_v) / 100.0;
 	double DSIGMA = (1.0 * DSIGMA_v) / 1000.0;
 	//std::string connectionString = "host=localhost port=1768 dbname=graphs user=postgres password =adu202121";
@@ -167,7 +168,7 @@ void filling(std::vector<Pora>& poras, std::vector<double>& volume_filled_graph,
 	// параметры давлени€. Ќачало, конец, шаг на заполнение, шаг на вытекание
 	double pressure_start = 0;
 	double pressure_end = 34000001;
-	double pressure_step = 10000;
+	double pressure_step = 100000;
 	double poras_N = pow(N, 3.0);
 
 
@@ -196,8 +197,29 @@ void filling(std::vector<Pora>& poras, std::vector<double>& volume_filled_graph,
 		interp_b.push_back(y[i] - interp_k[i] * x[i]);
 	}
 
-	Generation_Poras_experiment(x, y, interp_k, interp_b, Rad, core, poras, N);
-	//Generation_Poras_gauss(Rad, core, poras, N, sii);
+
+
+	/////////////////////////////////////////////////////////////////
+	std::random_device rd_merge;
+	std::mt19937 gen_merge(rd_merge());
+	std::uniform_int_distribution<int> uid_merge(0, 99);
+	int r_merge = 0;
+
+	std::vector<Pora> poras_experiment;
+	std::vector<Pora> poras_gauss;
+	Generation_Poras_experiment(x, y, interp_k, interp_b, Rad, core, poras_experiment, N);
+	Generation_Poras_gauss(Rad, core, poras_gauss, N, sii);
+	
+	for (int i = 0; i < poras_experiment.size(); i++) {
+		r_merge = uid_merge(gen_merge);
+		if (r_merge < 1000) {
+			poras.push_back(poras_experiment[i]);
+		}
+		else {
+			poras.push_back(poras_gauss[i]);
+		}
+	}
+	/////////////////////////////////////////////////////////////////
 
 
 	std::vector<int> bound_1;
@@ -208,27 +230,27 @@ void filling(std::vector<Pora>& poras, std::vector<double>& volume_filled_graph,
 	std::vector<int> bound_6;
 	std::vector<int> bound;
 	for (int i = 0; i < poras.size(); i++) {
-		if (poras[i].get_X() == Rad * core / 2.0) {
+		if (poras[i].get_X() == Rad * core) {
 			poras[i].set_border(1);
 			bound_1.push_back(i);
 		}
-		else if (poras[i].get_X() == Rad * core / 2.0 + (N - 1) * (Rad + Rad) * core) {
+		else if (poras[i].get_X() == Rad * core + (N - 1) * (Rad + Rad) * core) {
 			poras[i].set_border(1);
 			bound_2.push_back(i);
 		}
-		if (poras[i].get_Y() == Rad * core / 2.0) {
+		if (poras[i].get_Y() == Rad * core) {
 			poras[i].set_border(1);
 			bound_3.push_back(i);
 		}
-		else if (poras[i].get_Y() == Rad * core / 2.0 + (N - 1) * (Rad + Rad) * core) {
+		else if (poras[i].get_Y() == Rad * core + (N - 1) * (Rad + Rad) * core) {
 			poras[i].set_border(1);
 			bound_4.push_back(i);
 		}
-		if (poras[i].get_Z() == Rad * core / 2.0) {
+		if (poras[i].get_Z() == Rad * core) {
 			poras[i].set_border(1);
 			bound_5.push_back(i);
 		}
-		else if (poras[i].get_Z() == Rad * core / 2.0 + (N - 1) * (Rad + Rad) * core) {
+		else if (poras[i].get_Z() == Rad * core + (N - 1) * (Rad + Rad) * core) {
 			poras[i].set_border(1);
 			bound_6.push_back(i);
 		}
@@ -237,6 +259,31 @@ void filling(std::vector<Pora>& poras, std::vector<double>& volume_filled_graph,
 		}
 
 	}
+	///////////////////////////////////////////////////////////////////
+
+	
+	std::vector<int> for_del(0);
+	std::random_device rd_del;
+	std::mt19937 gen_del(rd_del());
+	std::uniform_int_distribution<int> uid_del(0, 99);
+	int r_del = 0;
+	for (int i = 0; i < poras.size(); i++) {
+		if (!poras[i].get_border()) {
+			r_del = uid_del(gen_del);
+			if (r_del < persent_for_del) {
+				for_del.push_back(i);
+			}
+		}
+	}
+	for (int i = 0; i < for_del.size(); i++) {
+		poras[for_del[i]].set_Rad(0.001);
+	}
+
+	
+
+	///////////////////////////////////////////////////////////////////
+
+
 	int neighbors_pos[26] = { -1, +1, N + 1, N - 1, -N - 1, -N + 1, N, -N, N * N, N * N + 1, N * N - 1, N * N + N, N * N - N,
 		   N * N + N + 1, N * N + N - 1, N * N - N + 1, N * N - N - 1, -N * N, -N * N + 1, -N * N - 1,
 		   -N * N + N, -N * N - N, -N * N + N + 1, -N * N + N - 1, -N * N - N + 1, -N * N - N - 1 };
@@ -356,6 +403,28 @@ void leakage(std::vector<Pora>& poras, std::vector<double>& volume_filled_graph_
 			zap_num.push_back(i);
 		}
 	}
+	//////////////////////////////////////////////////////
+	/*
+	std::vector<int> for_del(0);
+	std::random_device rd_del;
+	std::mt19937 gen_del(rd_del());
+	std::uniform_int_distribution<int> uid_del(0, 99);
+	int r_del = 0;
+	for (int i = 0; i < zap_num.size(); i++) {
+		r_del = uid_del(gen_del);
+		if (r_del < 3) {
+			for_del.push_back(zap_num[i]);
+		}
+	}
+	for (int i = 0; i < for_del.size(); i++) {
+		volume_filled -= ((4.0 * M_PI * pow(poras[for_del[i]].get_Rad(), 3.0)) / 3.0);
+		poras[for_del[i]].set_filled(0);
+		auto it_del = std::find(zap_num.begin(), zap_num.end(), for_del[i]);
+		int pos_zap_del = std::distance(begin(zap_num), it_del);
+		zap_num.erase(zap_num.begin() + pos_zap_del);
+	}
+	*/
+	//////////////////////////////////////////////////////
 	double pressure_start = 0;
 	double pressure_end = 34000001;
 	double pressure_step = 100000;
@@ -373,7 +442,11 @@ void leakage(std::vector<Pora>& poras, std::vector<double>& volume_filled_graph_
 	double e_level = 0.0;
 	double e_level_multi = 0.0;
 	for (double pres = pressure_end - 1; pres > pressure_start - 1; pres -= pressure_step) {
-		//std::cout << pres << std::endl;
+		/*
+		if (outflow_M == 2) {
+			std::cout << pres << std::endl;
+		}
+		*/
 		out_num_new = 1;
 
 		if (border_C == 1) {
@@ -478,7 +551,7 @@ void leakage(std::vector<Pora>& poras, std::vector<double>& volume_filled_graph_
 				}
 			}
 
-
+			poras_Energy_multi = {};
 			if (poras_Energy.size() || poras_Energy_multi.size()) {
 				switch (outflow_M) {
 				case 0:
@@ -587,7 +660,7 @@ void leakage(std::vector<Pora>& poras, std::vector<double>& volume_filled_graph_
 						porous_neibors.push_back(poras[pos_e_p].filled_now(poras));
 					}
 					else {
-						//std::cout << "e_level_multi: "<< e_level_multi<<" e_level: "<< e_level << " pres: " << pres << std::endl;
+						//std::cout << "e_level_multi: "<< e_level_multi<<" e_level: "<< e_level << " pres: " << pres << " zap_num: "<<zap_num.size() << std::endl;
 						for (auto pos_e_p : poras_Energy_pos_multi[pos_e_multi]) {
 							//summmm++;
 							poras[pos_e_p].set_emptied(1);
@@ -671,24 +744,26 @@ void leakage(std::vector<Pora>& poras, std::vector<double>& volume_filled_graph_
 	*/
 }
 
-void genegate_body(int N, std::vector<int> core_v, std::vector<int> DSIGMA_v, int i_min, int i_max, std::string connectionString, int body_id) {
+void genegate_body(int N, std::vector<int> core_v, std::vector<int> DSIGMA_v, int i_min, int i_max, std::string connectionString, int body_id, std::vector<int> persent_for_del_vec) {
 	mtx.lock();
 	std::cout << "Generate id: " << std::this_thread::get_id() << " started" << std::endl;
 	mtx.unlock();
 	for (size_t i = i_min; i < i_max; i++) {
 		for (size_t j = 0; j < DSIGMA_v.size(); j++) {
+			for (auto persent_for_del : persent_for_del_vec) {
+				std::string table_name = "body_core_" + std::to_string(core_v[i]) + "_DS_" + std::to_string(DSIGMA_v[j]) + "_ID_" + std::to_string(body_id)+ "_PFD_"+ std::to_string(persent_for_del);
+				std::string graph_id = std::to_string(core_v[i]) + std::to_string(DSIGMA_v[j]) + std::to_string(body_id) + std::to_string(persent_for_del);
+				std::vector<Pora> poras;
+				std::vector<double> volume_filled_graph;
+				std::vector<double> pressure_graph;
+				double volume_filled = 0;
+				filling(poras, volume_filled_graph, pressure_graph, volume_filled, N, core_v[i], DSIGMA_v[j], persent_for_del);
+				std::string connectionString_graphs = "host=localhost port=1768 dbname=graphs user=postgres password =adu202121";
+				insert_into_table_graph(graph_id, volume_filled_graph, pressure_graph, "graph_in", connectionString_graphs);
+				create_table(table_name, connectionString);
+				insert_into_table(poras, table_name, connectionString);
 
-			std::string table_name = "body_core_" + std::to_string(core_v[i]) + "_DS_" + std::to_string(DSIGMA_v[j]) + "_ID_" + std::to_string(body_id);
-			std::string graph_id = std::to_string(core_v[i]) + std::to_string(DSIGMA_v[j]) + std::to_string(body_id);
-			std::vector<Pora> poras;
-			std::vector<double> volume_filled_graph;
-			std::vector<double> pressure_graph;
-			double volume_filled = 0;
-			filling(poras, volume_filled_graph, pressure_graph, volume_filled, N, core_v[i], DSIGMA_v[j]);
-			std::string connectionString_graphs = "host=localhost port=1768 dbname=graphs user=postgres password =adu202121";
-			insert_into_table_graph(graph_id, volume_filled_graph, pressure_graph, "graph_in", connectionString_graphs);
-			create_table(table_name, connectionString);
-			insert_into_table(poras, table_name, connectionString);
+			}
 		}
 	}
 	mtx.lock();
@@ -696,33 +771,35 @@ void genegate_body(int N, std::vector<int> core_v, std::vector<int> DSIGMA_v, in
 	mtx.unlock();
 }
 
-void empty_body(std::vector<int> core_v, std::vector<int> DSIGMA_v, int i_min, int i_max, std::string connectionString, std::vector<int> body_id, int border_C, int outflow_M) {
+void empty_body(std::vector<int> core_v, std::vector<int> DSIGMA_v, int i_min, int i_max, std::string connectionString, std::vector<int> body_id, int border_C, int outflow_M, std::vector<int> persent_for_del_vec) {
 	mtx.lock();
 	std::cout << "Empty id: " << std::this_thread::get_id() << " " << border_C << " " << outflow_M << " started" << std::endl;
 	mtx.unlock();
 	for (size_t k = 0; k < body_id.size(); k++) {
 		for (size_t i = i_min; i < i_max; i++) {
 			for (size_t j = 0; j < DSIGMA_v.size(); j++) {
-				std::string table_name = "body_core_" + std::to_string(core_v[i]) + "_DS_" + std::to_string(DSIGMA_v[j]) + "_ID_" + std::to_string(body_id[k]);
-				std::string graph_id = std::to_string(core_v[i]) + std::to_string(DSIGMA_v[j]) + std::to_string(body_id[k]) + std::to_string(border_C) + std::to_string(outflow_M);
-				std::vector<Pora> poras;
-				select_from_table(poras, table_name, connectionString);
-				double volume_filled = 0;
+				for (auto persent_for_del : persent_for_del_vec) {
+					std::string table_name = "body_core_" + std::to_string(core_v[i]) + "_DS_" + std::to_string(DSIGMA_v[j]) + "_ID_" + std::to_string(body_id[k]) + "_PFD_" + std::to_string(persent_for_del);
+					std::string graph_id = std::to_string(core_v[i]) + std::to_string(DSIGMA_v[j]) + std::to_string(body_id[k]) + std::to_string(border_C) + std::to_string(outflow_M) + std::to_string(persent_for_del);
+					std::vector<Pora> poras;
+					select_from_table(poras, table_name, connectionString);
+					double volume_filled = 0;
 
-				for (size_t i = 0; i < poras.size(); i++) {
-					if (poras[i].get_filled() && !(poras[i].get_border())) {
-						volume_filled += ((4.0 * M_PI * pow(poras[i].get_Rad(), 3.0)) / 3.0);
+					for (size_t i = 0; i < poras.size(); i++) {
+						if (poras[i].get_filled() && !(poras[i].get_border())) {
+							volume_filled += ((4.0 * M_PI * pow(poras[i].get_Rad(), 3.0)) / 3.0);
+						}
 					}
-				}
-				std::vector<double> volume_filled_graph_out;
-				std::vector<double> pressure_graph_out;
-				std::vector<int> porous_neibors;
-				leakage(poras, volume_filled_graph_out, pressure_graph_out, volume_filled, core_v[i], DSIGMA_v[j], border_C, outflow_M, porous_neibors);
+					std::vector<double> volume_filled_graph_out;
+					std::vector<double> pressure_graph_out;
+					std::vector<int> porous_neibors;
+					leakage(poras, volume_filled_graph_out, pressure_graph_out, volume_filled, core_v[i], DSIGMA_v[j], border_C, outflow_M, porous_neibors);
 
-				std::string connectionString_graphs = "host=localhost port=1768 dbname=graphs user=postgres password =adu202121";
-				insert_into_table_graph(graph_id, volume_filled_graph_out, pressure_graph_out, "graph_out", connectionString_graphs);
-				connectionString_graphs = "host=localhost port=1768 dbname=graphs user=postgres password =adu202121";
-				insert_into_table_graph_li(graph_id, porous_neibors, connectionString_graphs);
+					std::string connectionString_graphs = "host=localhost port=1768 dbname=graphs user=postgres password =adu202121";
+					insert_into_table_graph(graph_id, volume_filled_graph_out, pressure_graph_out, "graph_out", connectionString_graphs);
+					connectionString_graphs = "host=localhost port=1768 dbname=graphs user=postgres password =adu202121";
+					insert_into_table_graph_li(graph_id, porous_neibors, connectionString_graphs);
+				}
 			}
 		}
 	}
@@ -733,6 +810,17 @@ void empty_body(std::vector<int> core_v, std::vector<int> DSIGMA_v, int i_min, i
 
 
 int main() {
+	///
+	///
+	/// ѕовысить core что позволит уменьшить количство сеседей, но сильно уменьшить DSigma
+	/// 
+	/// ѕосле генерации тела по гаусовому закону, пройти по порам и у пор с большим количеством соседей заменить радиус случайной величининой из  эксперимента
+	/// 
+	///
+	///
+	/// 
+	/// 
+	///
 	SimpleTimer st;
 	SetConsoleOutputCP(1251);
 	std::string connectionString = "host=localhost port=1768 dbname=porous_body user=postgres password =adu202121";
@@ -756,34 +844,45 @@ int main() {
 // border_C: 0 - не учитываем, 1 - расчЄт после измениени€ давлени€, 2 - расчЄт дл€ каждой
 // outflow_M: 0 - все, 1 - случайна€, 2 - с минимальной энерги€ей
 //std::vector<int> body_id = { 1,2,3,4,5,6,7,8,9,10 };
-	std::vector<int> body_id = { 11 };
+	std::vector<int> body_id = { 66 };
 	std::vector<int> border_C = { 0,1,2 };
 	std::vector<int> outflow_M = { 0,1,2 };
 	std::vector<int> core_v;
 	std::vector<int> DSIGMA_v;
-	for (size_t i = 1; i <= 10; i++) {
-		core_v.push_back(82);
+	for (size_t i = 0; i <= 10; i++) {
+		core_v.push_back(93 + 2 * i);
 	}
-	for (size_t i = 1; i <= 1; i++) {
-		DSIGMA_v.push_back(25);
+	for (size_t i = 0; i <= 0; i++) {
+		DSIGMA_v.push_back(9 + 2 * i);
 	}
+
+	std::vector<int> persent_for_del_vec = { 0 };
 
 	std::cout << "ѕор на границе: ";
 	int N;
 	std::cin >> N;
-	//genegate_body(N, core_v, DSIGMA_v, 0 * core_v.size() / 10, 1 * core_v.size() / 10, connectionString, body_id[0]);
-	//std::thread th1_in(genegate_body, N, core_v, DSIGMA_v, 0 * core_v.size() / 10, 1 * core_v.size() / 10, connectionString, body_id[0]);
+
+	/////////////////////////////////////////////////
+	std::thread th0_in(genegate_body, N, core_v, DSIGMA_v, 0 * core_v.size() / 11, 1 * core_v.size() / 11, connectionString, body_id[0], persent_for_del_vec);
+	
+	//std::thread th1_in(genegate_body, N, core_v, DSIGMA_v, 1 * core_v.size() / 11, 2 * core_v.size() / 11, connectionString, body_id[0], persent_for_del_vec);
 	/*
-	std::thread th2_in(genegate_body, N, core_v, DSIGMA_v, 1 * core_v.size() / 10, 2 * core_v.size() / 10, connectionString, body_id[1]);
-	std::thread th3_in(genegate_body, N, core_v, DSIGMA_v, 2 * core_v.size() / 10, 3 * core_v.size() / 10, connectionString, body_id[2]);
-	std::thread th4_in(genegate_body, N, core_v, DSIGMA_v, 3 * core_v.size() / 10, 4 * core_v.size() / 10, connectionString, body_id[0]);
-	std::thread th5_in(genegate_body, N, core_v, DSIGMA_v, 4 * core_v.size() / 10, 5 * core_v.size() / 10, connectionString, body_id[0]);
-	std::thread th6_in(genegate_body, N, core_v, DSIGMA_v, 5 * core_v.size() / 10, 6 * core_v.size() / 10, connectionString, body_id[0]);
-	std::thread th7_in(genegate_body, N, core_v, DSIGMA_v, 6 * core_v.size() / 10, 7 * core_v.size() / 10, connectionString, body_id[0]);
-	std::thread th8_in(genegate_body, N, core_v, DSIGMA_v, 7 * core_v.size() / 10, 8 * core_v.size() / 10, connectionString, body_id[0]);
-	std::thread th9_in(genegate_body, N, core_v, DSIGMA_v, 8 * core_v.size() / 10, 9 * core_v.size() / 10, connectionString, body_id[0]);
-	std::thread th10_in(genegate_body, N, core_v, DSIGMA_v, 9 * core_v.size() / 10, 10 * core_v.size() / 10, connectionString, body_id[0]);
+	std::thread th2_in(genegate_body, N, core_v, DSIGMA_v, 2 * core_v.size() / 11, 3 * core_v.size() / 11, connectionString, body_id[0]);
+	std::thread th3_in(genegate_body, N, core_v, DSIGMA_v, 3 * core_v.size() / 11, 4 * core_v.size() / 11, connectionString, body_id[0]);
+	std::thread th4_in(genegate_body, N, core_v, DSIGMA_v, 4 * core_v.size() / 11, 5 * core_v.size() / 11, connectionString, body_id[0]);
+	std::thread th5_in(genegate_body, N, core_v, DSIGMA_v, 5 * core_v.size() / 11, 6 * core_v.size() / 11, connectionString, body_id[0]);
+	std::thread th6_in(genegate_body, N, core_v, DSIGMA_v, 6 * core_v.size() / 11, 7 * core_v.size() / 11, connectionString, body_id[0]);
 	*/
+	/*
+	std::thread th7_in(genegate_body, N, core_v, DSIGMA_v, 7 * core_v.size() / 11, 8 * core_v.size() / 11, connectionString, body_id[0]);
+	std::thread th8_in(genegate_body, N, core_v, DSIGMA_v, 8 * core_v.size() / 11, 9 * core_v.size() / 11, connectionString, body_id[0]);
+	std::thread th9_in(genegate_body, N, core_v, DSIGMA_v, 9 * core_v.size() / 11, 10 * core_v.size() / 11, connectionString, body_id[0]);
+	std::thread th10_in(genegate_body, N, core_v, DSIGMA_v, 10 * core_v.size() / 11, 11 * core_v.size() / 11, connectionString, body_id[0]);
+	*/
+
+	/////////////////////////////////////////////////
+	th0_in.join();
+	
 	//th1_in.join();
 	/*
 	th2_in.join();
@@ -791,48 +890,131 @@ int main() {
 	th4_in.join();
 	th5_in.join();
 	th6_in.join();
+	*/
+	/*
 	th7_in.join();
 	th8_in.join();
 	th9_in.join();
 	th10_in.join();
 	*/
 
+	/////////////////////////////////////////////////
 
-	//std::cout << "Stop test" << std::endl;
-	//std::cin >> N;
-
-	//empty_body(core_v, DSIGMA_v, 0 * core_v.size() / 10, 1 * core_v.size() / 10, connectionString, body_id, border_C[0], outflow_M[0]);
-
-	//std::thread th1_out(empty_body, core_v, DSIGMA_v, 0 * core_v.size() / 10, 1 * core_v.size() / 10, connectionString, body_id, border_C[2], outflow_M[2]);
-	/*
-	std::thread th2_out(empty_body, core_v, DSIGMA_v, 1 * core_v.size() / 10, 2 * core_v.size() / 10, connectionString, body_id, border_C[0], outflow_M[1]);
-	std::thread th3_out(empty_body, core_v, DSIGMA_v, 2 * core_v.size() / 10, 3 * core_v.size() / 10, connectionString, body_id, border_C[0], outflow_M[2]);
-	std::thread th4_out(empty_body, core_v, DSIGMA_v, 3 * core_v.size() / 10, 4 * core_v.size() / 10, connectionString, body_id, border_C[1], outflow_M[0]);
-	std::thread th5_out(empty_body, core_v, DSIGMA_v, 4 * core_v.size() / 10, 5 * core_v.size() / 10, connectionString, body_id, border_C[1], outflow_M[1]);
-	std::thread th6_out(empty_body, core_v, DSIGMA_v, 5 * core_v.size() / 10, 6 * core_v.size() / 10, connectionString, body_id, border_C[1], outflow_M[2]);
-	*/
-	std::thread th7_out(empty_body, core_v, DSIGMA_v, 6 * core_v.size() / 10, 7 * core_v.size() / 10, connectionString, body_id, border_C[2], outflow_M[0]);
-	std::thread th8_out(empty_body, core_v, DSIGMA_v, 7 * core_v.size() / 10, 8 * core_v.size() / 10, connectionString, body_id, border_C[2], outflow_M[1]);
-	std::thread th9_out(empty_body, core_v, DSIGMA_v, 8 * core_v.size() / 10, 9 * core_v.size() / 10, connectionString, body_id, border_C[2], outflow_M[2]);
+	//////////////////////////////////////////
 	
-	//std::thread th10_out(empty_body, core_v, DSIGMA_v, 9 * core_v.size() / 10, 10 * core_v.size() / 10, connectionString, body_id, border_C[2], outflow_M[2]);
-
-	//th1_out.join();
+	std::thread th00_out(empty_body, core_v, DSIGMA_v, 0 * core_v.size() / 11, 1 * core_v.size() / 11, connectionString, body_id, border_C[2], outflow_M[0], persent_for_del_vec);
 	/*
-	th2_out.join();
-	th3_out.join();
-	th4_out.join();
-	th5_out.join();
-	th6_out.join();
+	std::thread th01_out(empty_body, core_v, DSIGMA_v, 1 * core_v.size() / 11, 2 * core_v.size() / 11, connectionString, body_id, border_C[2], outflow_M[0]);
+	std::thread th02_out(empty_body, core_v, DSIGMA_v, 2 * core_v.size() / 11, 3 * core_v.size() / 11, connectionString, body_id, border_C[2], outflow_M[0]);
+	std::thread th03_out(empty_body, core_v, DSIGMA_v, 3 * core_v.size() / 11, 4 * core_v.size() / 11, connectionString, body_id, border_C[2], outflow_M[0]);
+	std::thread th04_out(empty_body, core_v, DSIGMA_v, 4 * core_v.size() / 11, 5 * core_v.size() / 11, connectionString, body_id, border_C[2], outflow_M[0]);
+	std::thread th05_out(empty_body, core_v, DSIGMA_v, 5 * core_v.size() / 11, 6 * core_v.size() / 11, connectionString, body_id, border_C[2], outflow_M[0]);
+	std::thread th06_out(empty_body, core_v, DSIGMA_v, 6 * core_v.size() / 11, 7 * core_v.size() / 11, connectionString, body_id, border_C[2], outflow_M[0]);
 	*/
-	th7_out.join();
-	th8_out.join();
-	th9_out.join();
+	/*
+	std::thread th07_out(empty_body, core_v, DSIGMA_v, 7 * core_v.size() / 11, 8 * core_v.size() / 11, connectionString, body_id, border_C[2], outflow_M[0]);
+	std::thread th08_out(empty_body, core_v, DSIGMA_v, 8 * core_v.size() / 11, 9 * core_v.size() / 11, connectionString, body_id, border_C[2], outflow_M[0]);
+	std::thread th09_out(empty_body, core_v, DSIGMA_v, 9 * core_v.size() / 11, 10 * core_v.size() / 11, connectionString, body_id, border_C[2], outflow_M[0]);
+	std::thread th010_out(empty_body, core_v, DSIGMA_v, 10 * core_v.size() / 11, 11 * core_v.size() / 11, connectionString, body_id, border_C[2], outflow_M[0]);
+	*/
+	
+	//////////////////////////////////////////
+	
+	//th00_out.join();
+	/*
+	th01_out.join();
+	th02_out.join();
+	th03_out.join();
+	th04_out.join();
+	th05_out.join();
+	th06_out.join();
+	*/
+	/*
+	th07_out.join();
+	th08_out.join();
+	th09_out.join();
+	th010_out.join();
+	*/
+	
+	//////////////////////////////////////////
+	
+	std::thread th10_out(empty_body, core_v, DSIGMA_v, 0 * core_v.size() / 11, 1 * core_v.size() / 11, connectionString, body_id, border_C[2], outflow_M[1], persent_for_del_vec);
+	/*
+	std::thread th11_out(empty_body, core_v, DSIGMA_v, 1 * core_v.size() / 11, 2 * core_v.size() / 11, connectionString, body_id, border_C[2], outflow_M[1]);
+	std::thread th12_out(empty_body, core_v, DSIGMA_v, 2 * core_v.size() / 11, 3 * core_v.size() / 11, connectionString, body_id, border_C[2], outflow_M[1]);
+	std::thread th13_out(empty_body, core_v, DSIGMA_v, 3 * core_v.size() / 11, 4 * core_v.size() / 11, connectionString, body_id, border_C[2], outflow_M[1]);
+	std::thread th14_out(empty_body, core_v, DSIGMA_v, 4 * core_v.size() / 11, 5 * core_v.size() / 11, connectionString, body_id, border_C[2], outflow_M[1]);
+	std::thread th15_out(empty_body, core_v, DSIGMA_v, 5 * core_v.size() / 11, 6 * core_v.size() / 11, connectionString, body_id, border_C[2], outflow_M[1]);
+	std::thread th16_out(empty_body, core_v, DSIGMA_v, 6 * core_v.size() / 11, 7 * core_v.size() / 11, connectionString, body_id, border_C[2], outflow_M[1]);
+	*/
+	/*
+	std::thread th17_out(empty_body, core_v, DSIGMA_v, 7 * core_v.size() / 11, 8 * core_v.size() / 11, connectionString, body_id, border_C[2], outflow_M[1]);
+	std::thread th18_out(empty_body, core_v, DSIGMA_v, 8 * core_v.size() / 11, 9 * core_v.size() / 11, connectionString, body_id, border_C[2], outflow_M[1]);
+	std::thread th19_out(empty_body, core_v, DSIGMA_v, 9 * core_v.size() / 11, 10 * core_v.size() / 11, connectionString, body_id, border_C[2], outflow_M[1]);
+	std::thread th110_out(empty_body, core_v, DSIGMA_v, 10 * core_v.size() / 11, 11 * core_v.size() / 11, connectionString, body_id, border_C[2], outflow_M[1]);
+	*/
+
+	//////////////////////////////////////////
 	
 	//th10_out.join();
+	/*
+	th11_out.join();
+	th12_out.join();
+	th13_out.join();
+	th14_out.join();
+	th15_out.join();
+	th16_out.join();
+	*/
+	/*
+	th17_out.join();
+	th18_out.join();
+	th19_out.join();
+	th110_out.join();
+	*/
 
+	//////////////////////////////////////////
+	
+	std::thread th20_out(empty_body, core_v, DSIGMA_v, 0 * core_v.size() / 11, 1 * core_v.size() / 11, connectionString, body_id, border_C[2], outflow_M[2], persent_for_del_vec);
+	/*
+	std::thread th21_out(empty_body, core_v, DSIGMA_v, 1 * core_v.size() / 11, 2 * core_v.size() / 11, connectionString, body_id, border_C[2], outflow_M[2]);
+	std::thread th22_out(empty_body, core_v, DSIGMA_v, 2 * core_v.size() / 11, 3 * core_v.size() / 11, connectionString, body_id, border_C[2], outflow_M[2]);
+	std::thread th23_out(empty_body, core_v, DSIGMA_v, 3 * core_v.size() / 11, 4 * core_v.size() / 11, connectionString, body_id, border_C[2], outflow_M[2]);
+	std::thread th24_out(empty_body, core_v, DSIGMA_v, 4 * core_v.size() / 11, 5 * core_v.size() / 11, connectionString, body_id, border_C[2], outflow_M[2]);
+	std::thread th25_out(empty_body, core_v, DSIGMA_v, 5 * core_v.size() / 11, 6 * core_v.size() / 11, connectionString, body_id, border_C[2], outflow_M[2]);
+	std::thread th26_out(empty_body, core_v, DSIGMA_v, 6 * core_v.size() / 11, 7 * core_v.size() / 11, connectionString, body_id, border_C[2], outflow_M[2]);
+	*/
+	/*
+	std::thread th27_out(empty_body, core_v, DSIGMA_v, 7 * core_v.size() / 11, 8 * core_v.size() / 11, connectionString, body_id, border_C[2], outflow_M[2]);
+	std::thread th28_out(empty_body, core_v, DSIGMA_v, 8 * core_v.size() / 11, 9 * core_v.size() / 11, connectionString, body_id, border_C[2], outflow_M[2]);
+	std::thread th29_out(empty_body, core_v, DSIGMA_v, 9 * core_v.size() / 11, 10 * core_v.size() / 11, connectionString, body_id, border_C[2], outflow_M[2]);
+	std::thread th210_out(empty_body, core_v, DSIGMA_v, 10 * core_v.size() / 11, 11 * core_v.size() / 11, connectionString, body_id, border_C[2], outflow_M[2]);
+	*/
 
+	//////////////////////////////////////////
+	th00_out.join();
+	th10_out.join();
+	th20_out.join();
+	/*
+	th21_out.join();
+	th22_out.join();
+	th23_out.join();
+	th24_out.join();
+	th25_out.join();
+	th26_out.join();
+	*/
+	/*
+	th27_out.join();
+	th28_out.join();
+	th29_out.join();
+	th210_out.join();
+	*/
+
+	//////////////////////////////////////////
+	
+	//////////////////////////////////////////
+	//////////////////////////////////////////
 
 	std::cout << "Success" << std::endl;
 
+	return 0;
 }

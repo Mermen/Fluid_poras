@@ -64,6 +64,9 @@ public: Pora(double x, double y, double z, double Rad, int border, int filled, i
 		  return this->neighbors_area;
 	  }
 
+	  void set_Rad(double Rad) {
+		  this->Rad = Rad;
+	  }
 	  void set_border(int border) {
 		  this->border = border;
 	  }
@@ -123,7 +126,13 @@ public: Pora(double x, double y, double z, double Rad, int border, int filled, i
 			  for (int i = 0; i < this->neighbors_num.size(); i++) {
 				  road += poras[neighbors_num[i]].road_to_board(poras);
 			  }
-			  return (road > 0);
+			  if (road) {
+				  this->way_to_board = 1;
+				  return 1;
+			  }
+			  else {
+				  return 0;
+			  }
 		  }
 	  }
 
