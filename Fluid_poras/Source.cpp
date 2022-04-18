@@ -49,9 +49,12 @@ void Generation_Poras_experiment(std::vector<double>& x, std::vector<double>& y,
 	double min_y = *min_element(y.begin(), y.end());
 	double max_y = *max_element(y.begin(), y.end());
 	std::random_device rd_X;
-	std::uniform_real_distribution<> uid_X(min_x + 0.1, max_x - 0.1);
+	std::mt19937 mt_X(rd_X());
+	std::uniform_real_distribution<> dist_X(min_x, max_x);
+	//pos_e = dist(mt);
 	std::random_device rd_Y;
-	std::uniform_real_distribution<> uid_Y(min_y + 0.1, max_y - 0.1);
+	std::mt19937 mt_Y(rd_Y());
+	std::uniform_real_distribution<> dist_Y(min_y, max_y);
 	bool kj = 0;
 	double Rad_tmp = 0;
 	double pot_por_rad = 0;
@@ -61,8 +64,8 @@ void Generation_Poras_experiment(std::vector<double>& x, std::vector<double>& y,
 			for (int k = 0; k < N; k++) {
 				kj = 0;
 				while (!kj) {
-					pot_por_rad = uid_X(rd_X);
-					if (uid_Y(rd_Y) <= linear(x, y, interp_k, interp_b, pot_por_rad, x.size())) {
+					pot_por_rad = dist_X(mt_X);
+					if (dist_Y(mt_Y) <= linear(x, y, interp_k, interp_b, pot_por_rad, x.size())) {
 						Rad_tmp = pot_por_rad;
 						kj = 1;
 					}
@@ -268,7 +271,7 @@ void filling(std::vector<Pora>& poras, std::vector<double>& volume_filled_graph,
 	std::uniform_int_distribution<int> uid_del(0, 99);
 	int r_del = 0;
 	for (int i = 0; i < poras.size(); i++) {
-		if (!poras[i].get_border()) {
+		if (1 /* && !poras[i].get_border()*/) {
 			r_del = uid_del(gen_del);
 			if (r_del < persent_for_del) {
 				for_del.push_back(i);
@@ -844,7 +847,7 @@ int main() {
 // border_C: 0 - не учитываем, 1 - расчёт после измениения давления, 2 - расчёт для каждой
 // outflow_M: 0 - все, 1 - случайная, 2 - с минимальной энергияей
 //std::vector<int> body_id = { 1,2,3,4,5,6,7,8,9,10 };
-	std::vector<int> body_id = { 66 };
+	std::vector<int> body_id = { 68 };
 	std::vector<int> border_C = { 0,1,2 };
 	std::vector<int> outflow_M = { 0,1,2 };
 	std::vector<int> core_v;
@@ -856,7 +859,7 @@ int main() {
 		DSIGMA_v.push_back(9 + 2 * i);
 	}
 
-	std::vector<int> persent_for_del_vec = { 0 };
+	std::vector<int> persent_for_del_vec = { 10 };
 
 	std::cout << "Пор на границе: ";
 	int N;
