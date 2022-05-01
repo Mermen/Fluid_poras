@@ -1,15 +1,15 @@
 #pragma once
-class SimpleTimer {
+class simple_timer {
 public:
-	SimpleTimer() {
-		start = std::chrono::high_resolution_clock::now();
+	simple_timer() {
+		start_ = std::chrono::high_resolution_clock::now();
 	}
-	~SimpleTimer() {
-		end = std::chrono::high_resolution_clock::now();
-		std::chrono::duration<float> duration = end - start;
-		std::cout << "Duratatioan: " << duration.count() << " s" << std::endl;
+	~simple_timer() {
+		end_ = std::chrono::high_resolution_clock::now();
+		const std::chrono::duration<float> duration = end_ - start_;
+		std::cout << "Duration: " << duration.count() << " s" << std::endl;
 	}
 
 private:
-	std::chrono::time_point<std::chrono::steady_clock> start, end;
+	std::chrono::time_point<std::chrono::steady_clock> start_, end_;
 };
